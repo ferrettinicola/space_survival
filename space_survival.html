@@ -539,7 +539,8 @@
   <div class="lb-title">CLASSIFICA</div>
   <ul class="lb-list" id="lb-list"></ul>
 
-  <div style="margin-top:28px; pointer-events:all;">
+  <div style="margin-top:28px; pointer-events:all; display:flex; gap:14px;">
+    <button class="btn" style="font-size:12px;padding:12px 28px;background:rgba(0,245,255,0.12);color:var(--cyan);box-shadow:none;border:1px solid var(--border);" onclick="showStart()">← MENU</button>
     <button class="btn" onclick="startGame()">RIPROVA</button>
   </div>
 </div>
@@ -571,15 +572,29 @@ let elapsed = 0;
 let lastTime = 0;
 let animId;
 let player, meteors, particles, stars, thrustParticles, bullets;
-let meteorSpawnTimer = 0, meteorSpawnInterval = 2.2;
+let meteorSpawnTimer = 0, meteorSpawnInterval = 1.7;
 let splitTimer = 0, splitInterval = 5;
 let score = 0;
 let spaceObjects = [];
+let aliens = [];
+let alienBullets = [];
+let alienSpawnTimer = 0;
 let savedName = localStorage.getItem('vr_name') || '';
 
 // ─── WORLD ───────────────────────────────────────────────────────
-const WORLD_W = 8000, WORLD_H = 8000;
+const WORLD_W = 20000, WORLD_H = 20000;
 let camera = { x: WORLD_W / 2, y: WORLD_H / 2 };
+
+// Adjust world coordinates for toroidal wrap — picks closest copy to camera
+function wrapAdjust(wx, wy) {
+  let x = wx, y = wy;
+  const dx = x - camera.x, dy = y - camera.y;
+  if (dx >  WORLD_W / 2) x -= WORLD_W;
+  if (dx < -WORLD_W / 2) x += WORLD_W;
+  if (dy >  WORLD_H / 2) y -= WORLD_H;
+  if (dy < -WORLD_H / 2) y += WORLD_H;
+  return { x, y };
+}
 
 // ─── SKIN DEFINITIONS ────────────────────────────────────────────
 const SKINS = [
@@ -592,154 +607,214 @@ let selectedSkin = parseInt(localStorage.getItem('vr_skin') || '0');
 
 // ─── SHIP STATS ──────────────────────────────────────────────────
 const SHIP_STATS = [
-  { speed: 265, maxSpeed: 340, cooldown: 0.18, bulletSpeed: 700,  bulletType: 'normal' }, // VIPER
-  { speed: 310, maxSpeed: 400, cooldown: 0.26, bulletSpeed: 560,  bulletType: 'heavy'  }, // SCORPION
-  { speed: 195, maxSpeed: 270, cooldown: 0.09, bulletSpeed: 960,  bulletType: 'rapid'  }, // PHANTOM
-  { speed: 165, maxSpeed: 220, cooldown: 0.50, bulletSpeed: 480,  bulletType: 'beam'   }, // TITAN
+  { speed: 345, maxSpeed: 442, cooldown: 0.18, bulletSpeed: 910,  bulletType: 'normal' }, // VIPER
+  { speed: 403, maxSpeed: 520, cooldown: 0.26, bulletSpeed: 728,  bulletType: 'heavy'  }, // SCORPION
+  { speed: 254, maxSpeed: 351, cooldown: 0.09, bulletSpeed:1248,  bulletType: 'rapid'  }, // PHANTOM
+  { speed: 215, maxSpeed: 286, cooldown: 0.50, bulletSpeed: 624,  bulletType: 'beam'   }, // TITAN
 ];
 
 // ─── SPACE OBJECTS (planets, moons, galaxies) ────────────────────
 function initWorld() {
-  spaceObjects = [
-    // Galaxies (large, faint — drawn first)
-    { type:'galaxy', wx:1100, wy:900,  rx:360, ry:130, angle:0.5,  color:[160,190,255] },
-    { type:'galaxy', wx:5200, wy:7400, rx:280, ry:100, angle:1.4,  color:[255,190,160] },
-    { type:'galaxy', wx:6800, wy:1600, rx:220, ry:80,  angle:2.2,  color:[180,255,200] },
-    { type:'galaxy', wx:2800, wy:5500, rx:310, ry:120, angle:0.9,  color:[220,170,255] },
-    { type:'galaxy', wx:7400, wy:4400, rx:250, ry:95,  angle:1.8,  color:[255,240,180] },
-    // Planets
-    { type:'planet', wx:2100, wy:1600, r:88,  color:[180,75,35],  rings:true,  moons:[{r:14,orbit:125,angle:0.8,speed:0.22}] },
-    { type:'planet', wx:5600, wy:1100, r:65,  color:[35,85,200],  rings:false, moons:[{r:11,orbit:95,angle:2.1,speed:0.35},{r:7,orbit:125,angle:4.5,speed:0.18}] },
-    { type:'planet', wx:6900, wy:3400, r:115, color:[200,145,45], rings:true,  moons:[{r:18,orbit:155,angle:1.3,speed:0.14},{r:9,orbit:185,angle:3.0,speed:0.09}] },
-    { type:'planet', wx:1100, wy:4600, r:52,  color:[55,165,75],  rings:false, moons:[{r:10,orbit:78,angle:1.5,speed:0.40}] },
-    { type:'planet', wx:3600, wy:6100, r:98,  color:[135,55,200], rings:true,  moons:[] },
-    { type:'planet', wx:6300, wy:5900, r:72,  color:[200,95,55],  rings:false, moons:[{r:14,orbit:105,angle:0.3,speed:0.28}] },
-    { type:'planet', wx:4100, wy:2600, r:48,  color:[175,175,215],rings:false, moons:[] },
-    { type:'planet', wx:7300, wy:7100, r:82,  color:[70,200,185], rings:true,  moons:[{r:11,orbit:115,angle:2.8,speed:0.32}] },
-    { type:'planet', wx:2800, wy:3300, r:60,  color:[220,60,80],  rings:false, moons:[{r:8,orbit:85,angle:5.1,speed:0.45}] },
-    { type:'planet', wx:5000, wy:4500, r:105, color:[80,120,200], rings:true,  moons:[{r:16,orbit:140,angle:0.7,speed:0.19},{r:10,orbit:170,angle:3.5,speed:0.12}] },
+  spaceObjects = [];
+  const PLANET_COLORS = [
+    [180,75,35],[35,85,200],[200,145,45],[55,165,75],[135,55,200],
+    [200,95,55],[175,175,215],[70,200,185],[220,60,80],[80,120,200],
+    [160,200,80],[220,180,50],[80,180,220],[200,80,160],[255,200,100],
+    [60,140,180],[180,60,220],[100,220,120],[230,130,40],[140,80,255],
+    [255,120,60],[80,200,150],[200,140,255],[255,180,80],[60,200,220],
   ];
+
+  // ── Galaxies (15) ──
+  for (let i = 0; i < 15; i++) {
+    spaceObjects.push({
+      type: 'galaxy',
+      wx: Math.random() * WORLD_W, wy: Math.random() * WORLD_H,
+      rx: 280 + Math.random()*220, ry: 90 + Math.random()*100,
+      angle: Math.random() * Math.PI,
+      color: [
+        Math.floor(150+Math.random()*105),
+        Math.floor(150+Math.random()*105),
+        Math.floor(150+Math.random()*105),
+      ],
+    });
+  }
+
+  // ── Nebula patches (12) ──
+  for (let i = 0; i < 12; i++) {
+    const hue = Math.random();
+    let r=10,g=10,b=80;
+    if (hue < 0.25)      { r=80;g=0;b=120; }
+    else if (hue < 0.5)  { r=0;g=60;b=120; }
+    else if (hue < 0.75) { r=120;g=0;b=60; }
+    else                 { r=0;g=100;b=60; }
+    spaceObjects.push({
+      type:'nebula',
+      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
+      r: 900 + Math.random()*700,
+      color:[r, g, b, 0.08 + Math.random()*0.05],
+    });
+  }
+
+  // ── Star clusters (8) ──
+  for (let i = 0; i < 8; i++) {
+    const obj = {
+      type:'cluster',
+      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
+      r: 160 + Math.random()*200,
+      count: 60 + Math.floor(Math.random()*80),
+      stars: null,
+    };
+    obj.stars = Array.from({length: obj.count}, () => ({
+      dx: (Math.random()-0.5)*2*obj.r,
+      dy: (Math.random()-0.5)*2*obj.r,
+      r:  Math.random()*1.8+0.3,
+      alpha: Math.random()*0.6+0.3,
+    })).filter(s => Math.sqrt(s.dx*s.dx+s.dy*s.dy) < obj.r);
+    spaceObjects.push(obj);
+  }
+
+  // ── Black holes (4) ──
+  for (let i = 0; i < 4; i++) {
+    spaceObjects.push({
+      type:'blackhole',
+      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
+      r: 40 + Math.random()*35,
+    });
+  }
+
+  // ── Planets (75) — avoid tight cluster near spawn ──
+  const cx = WORLD_W/2, cy = WORLD_H/2;
+  let placed = 0;
+  while (placed < 75) {
+    const wx = Math.random()*WORLD_W, wy = Math.random()*WORLD_H;
+    const distFromCenter = Math.sqrt((wx-cx)**2+(wy-cy)**2);
+    if (distFromCenter < 600) continue; // keep spawn area clear
+    const r = 35 + Math.random()*100;
+    const color = PLANET_COLORS[Math.floor(Math.random()*PLANET_COLORS.length)];
+    const rings = Math.random() < 0.35;
+    const moonCount = Math.floor(Math.random()*3);
+    const moons = Array.from({length: moonCount}, () => ({
+      r: 6 + Math.floor(Math.random()*14),
+      orbit: r*(1.35 + Math.random()*0.8),
+      angle: Math.random()*Math.PI*2,
+      speed: 0.09 + Math.random()*0.42,
+    }));
+    spaceObjects.push({ type:'planet', wx, wy, r, color, rings, moons });
+    placed++;
+  }
 }
 
 function drawSpaceObjects() {
   spaceObjects.forEach(obj => {
-    ctx.save();
-    ctx.translate(obj.wx, obj.wy);
+    const {x: wx, y: wy} = wrapAdjust(obj.wx, obj.wy);
+    // Cull objects far outside viewport
+    const sx = wx - camera.x + W/2, sy = wy - camera.y + H/2;
+    const cullR = (obj.r || obj.rx || 250) * 2.5;
+    if (sx < -cullR || sx > W+cullR || sy < -cullR || sy > H+cullR) return;
 
-    if (obj.type === 'galaxy') {
-      const [gr, gg, gb] = obj.color;
+    ctx.save();
+    ctx.translate(wx, wy);
+
+    if (obj.type === 'nebula') {
+      const [r,g,b,a] = obj.color;
+      const grd = ctx.createRadialGradient(0,0,0,0,0,obj.r);
+      grd.addColorStop(0,   `rgba(${r},${g},${b},${a})`);
+      grd.addColorStop(0.5, `rgba(${r},${g},${b},${a*0.5})`);
+      grd.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,obj.r,0,Math.PI*2);
+      ctx.fillStyle=grd; ctx.fill();
+
+    } else if (obj.type === 'cluster') {
+      if (obj.stars) obj.stars.forEach(s => {
+        ctx.beginPath(); ctx.arc(s.dx, s.dy, s.r, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(220,235,255,${s.alpha})`;
+        ctx.fill();
+      });
+      // Core glow
+      const cg = ctx.createRadialGradient(0,0,0,0,0,obj.r*0.4);
+      cg.addColorStop(0,'rgba(200,220,255,0.12)'); cg.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,obj.r*0.4,0,Math.PI*2); ctx.fillStyle=cg; ctx.fill();
+
+    } else if (obj.type === 'blackhole') {
+      // Accretion disk (outer glow ring)
+      const disk = ctx.createRadialGradient(0,0,obj.r*1.1,0,0,obj.r*2.8);
+      disk.addColorStop(0,'rgba(255,160,30,0.30)');
+      disk.addColorStop(0.5,'rgba(255,80,0,0.12)');
+      disk.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,obj.r*2.8,0,Math.PI*2);
+      ctx.fillStyle=disk; ctx.fill();
+      // Dark center
+      ctx.beginPath(); ctx.arc(0,0,obj.r,0,Math.PI*2);
+      ctx.fillStyle='rgba(0,0,0,0.97)'; ctx.fill();
+      ctx.strokeStyle='rgba(255,120,0,0.5)'; ctx.lineWidth=1.5; ctx.stroke();
+
+    } else if (obj.type === 'galaxy') {
+      const [gr,gg,gb] = obj.color;
       ctx.rotate(obj.angle);
       ctx.scale(1, obj.ry / obj.rx);
-      // Outer halo
       const halo = ctx.createRadialGradient(0,0,0,0,0,obj.rx);
-      halo.addColorStop(0,   `rgba(${gr},${gg},${gb},0.10)`);
-      halo.addColorStop(0.4, `rgba(${gr},${gg},${gb},0.06)`);
-      halo.addColorStop(1,   'rgba(0,0,0,0)');
-      ctx.beginPath(); ctx.arc(0,0,obj.rx,0,Math.PI*2);
-      ctx.fillStyle=halo; ctx.fill();
-      // Core
+      halo.addColorStop(0,  `rgba(${gr},${gg},${gb},0.10)`);
+      halo.addColorStop(0.4,`rgba(${gr},${gg},${gb},0.06)`);
+      halo.addColorStop(1,  'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,obj.rx,0,Math.PI*2); ctx.fillStyle=halo; ctx.fill();
       const core = ctx.createRadialGradient(0,0,0,0,0,obj.rx*0.18);
-      core.addColorStop(0, `rgba(${gr},${gg},${gb},0.45)`);
-      core.addColorStop(1, `rgba(${gr},${gg},${gb},0)`);
-      ctx.beginPath(); ctx.arc(0,0,obj.rx*0.18,0,Math.PI*2);
-      ctx.fillStyle=core; ctx.fill();
-      // Arm hints
-      for (let arm = 0; arm < 3; arm++) {
-        ctx.save(); ctx.rotate(arm * Math.PI * 0.67);
-        const armG = ctx.createLinearGradient(0,0,obj.rx*0.55,0);
-        armG.addColorStop(0,   `rgba(${gr},${gg},${gb},0.18)`);
-        armG.addColorStop(1,   'rgba(0,0,0,0)');
+      core.addColorStop(0,`rgba(${gr},${gg},${gb},0.45)`); core.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,obj.rx*0.18,0,Math.PI*2); ctx.fillStyle=core; ctx.fill();
+      for (let arm=0; arm<3; arm++) {
+        ctx.save(); ctx.rotate(arm*Math.PI*0.67);
+        const ag=ctx.createLinearGradient(0,0,obj.rx*0.55,0);
+        ag.addColorStop(0,`rgba(${gr},${gg},${gb},0.18)`); ag.addColorStop(1,'rgba(0,0,0,0)');
         ctx.beginPath(); ctx.ellipse(obj.rx*0.28,0,obj.rx*0.3,obj.rx*0.08,0,0,Math.PI*2);
-        ctx.fillStyle=armG; ctx.fill(); ctx.restore();
+        ctx.fillStyle=ag; ctx.fill(); ctx.restore();
       }
 
     } else if (obj.type === 'planet') {
-      const [pr, pg, pb] = obj.color;
-      // Atmosphere glow
+      const [pr,pg,pb] = obj.color;
       const atm = ctx.createRadialGradient(0,0,obj.r*0.65,0,0,obj.r*1.45);
-      atm.addColorStop(0, `rgba(${pr},${pg},${pb},0.12)`);
-      atm.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.beginPath(); ctx.arc(0,0,obj.r*1.45,0,Math.PI*2);
-      ctx.fillStyle=atm; ctx.fill();
-
-      // Rings behind planet (drawn first, partially hidden later)
+      atm.addColorStop(0,`rgba(${pr},${pg},${pb},0.12)`); atm.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,obj.r*1.45,0,Math.PI*2); ctx.fillStyle=atm; ctx.fill();
       if (obj.rings) {
-        ctx.save(); ctx.scale(1, 0.26);
-        ctx.beginPath(); ctx.arc(0,0,obj.r*1.75,0,Math.PI*2);
-        ctx.lineWidth = obj.r * 0.28;
-        ctx.strokeStyle = `rgba(${pr+30},${pg+20},${pb+10},0.38)`;
-        ctx.stroke();
-        ctx.beginPath(); ctx.arc(0,0,obj.r*1.42,0,Math.PI*2);
-        ctx.lineWidth = obj.r * 0.12;
-        ctx.strokeStyle = `rgba(${pr+50},${pg+30},${pb+20},0.25)`;
-        ctx.stroke();
+        ctx.save(); ctx.scale(1,0.26);
+        ctx.beginPath(); ctx.arc(0,0,obj.r*1.75,0,Math.PI*2); ctx.lineWidth=obj.r*0.28;
+        ctx.strokeStyle=`rgba(${pr+30},${pg+20},${pb+10},0.38)`; ctx.stroke();
+        ctx.beginPath(); ctx.arc(0,0,obj.r*1.42,0,Math.PI*2); ctx.lineWidth=obj.r*0.12;
+        ctx.strokeStyle=`rgba(${pr+50},${pg+30},${pb+20},0.25)`; ctx.stroke();
         ctx.restore();
       }
-
-      // Planet sphere
       const sph = ctx.createRadialGradient(-obj.r*0.32,-obj.r*0.32,0,0,0,obj.r*1.05);
-      sph.addColorStop(0,   `rgb(${Math.min(255,pr+70)},${Math.min(255,pg+70)},${Math.min(255,pb+70)})`);
+      sph.addColorStop(0,`rgb(${Math.min(255,pr+70)},${Math.min(255,pg+70)},${Math.min(255,pb+70)})`);
       sph.addColorStop(0.45,`rgb(${pr},${pg},${pb})`);
-      sph.addColorStop(1,   `rgb(${Math.max(0,pr-65)},${Math.max(0,pg-65)},${Math.max(0,pb-65)})`);
-      ctx.beginPath(); ctx.arc(0,0,obj.r,0,Math.PI*2);
-      ctx.fillStyle=sph; ctx.fill();
-
-      // Shadow
+      sph.addColorStop(1,`rgb(${Math.max(0,pr-65)},${Math.max(0,pg-65)},${Math.max(0,pb-65)})`);
+      ctx.beginPath(); ctx.arc(0,0,obj.r,0,Math.PI*2); ctx.fillStyle=sph; ctx.fill();
       const shd = ctx.createRadialGradient(obj.r*0.38,obj.r*0.38,0,0,0,obj.r);
-      shd.addColorStop(0.35,'rgba(0,0,0,0)');
-      shd.addColorStop(1,   'rgba(0,0,25,0.72)');
+      shd.addColorStop(0.35,'rgba(0,0,0,0)'); shd.addColorStop(1,'rgba(0,0,25,0.72)');
       ctx.fillStyle=shd; ctx.fill();
-
-      // Specular
       ctx.beginPath(); ctx.arc(-obj.r*0.32,-obj.r*0.32,obj.r*0.22,0,Math.PI*2);
       ctx.fillStyle='rgba(255,255,255,0.11)'; ctx.fill();
-
-      // Surface bands (horizontal stripes)
       ctx.save(); ctx.beginPath(); ctx.arc(0,0,obj.r,0,Math.PI*2); ctx.clip();
-      for (let band = 0; band < 3; band++) {
-        const by = (band - 1) * obj.r * 0.5;
-        ctx.fillStyle = `rgba(0,0,0,${0.07 + band*0.03})`;
-        ctx.fillRect(-obj.r, by, obj.r*2, obj.r*0.18);
-      }
+      for (let b=0;b<3;b++) { ctx.fillStyle=`rgba(0,0,0,${0.07+b*0.03})`; ctx.fillRect(-obj.r,(b-1)*obj.r*0.5,obj.r*2,obj.r*0.18); }
       ctx.restore();
-
-      // Rings front (on top of planet)
       if (obj.rings) {
-        ctx.save(); ctx.scale(1, 0.26);
-        // Clip half circle behind planet
-        ctx.beginPath(); ctx.rect(-obj.r*2.5, 0, obj.r*5, obj.r*2.5);
-        ctx.clip();
-        ctx.beginPath(); ctx.arc(0,0,obj.r*1.75,0,Math.PI*2);
-        ctx.lineWidth = obj.r * 0.28;
-        ctx.strokeStyle = `rgba(${pr+30},${pg+20},${pb+10},0.5)`;
-        ctx.stroke();
-        ctx.beginPath(); ctx.arc(0,0,obj.r*1.42,0,Math.PI*2);
-        ctx.lineWidth = obj.r * 0.12;
-        ctx.strokeStyle = `rgba(${pr+50},${pg+30},${pb+20},0.32)`;
-        ctx.stroke();
+        ctx.save(); ctx.scale(1,0.26);
+        ctx.beginPath(); ctx.rect(-obj.r*2.5,0,obj.r*5,obj.r*2.5); ctx.clip();
+        ctx.beginPath(); ctx.arc(0,0,obj.r*1.75,0,Math.PI*2); ctx.lineWidth=obj.r*0.28;
+        ctx.strokeStyle=`rgba(${pr+30},${pg+20},${pb+10},0.5)`; ctx.stroke();
         ctx.restore();
       }
-
-      // Moons
       obj.moons.forEach(moon => {
         const ma = moon.angle + elapsed * moon.speed;
-        const mx = Math.cos(ma) * moon.orbit;
-        const my = Math.sin(ma) * moon.orbit * 0.38;
-        ctx.beginPath(); ctx.arc(mx, my, moon.r, 0, Math.PI*2);
-        const mg = ctx.createRadialGradient(mx-moon.r*0.3, my-moon.r*0.3, 0, mx, my, moon.r);
-        mg.addColorStop(0,'rgba(215,215,225,0.95)');
-        mg.addColorStop(1,'rgba(90,90,110,0.7)');
+        const mx = Math.cos(ma)*moon.orbit, my = Math.sin(ma)*moon.orbit*0.38;
+        ctx.beginPath(); ctx.arc(mx,my,moon.r,0,Math.PI*2);
+        const mg=ctx.createRadialGradient(mx-moon.r*0.3,my-moon.r*0.3,0,mx,my,moon.r);
+        mg.addColorStop(0,'rgba(215,215,225,0.95)'); mg.addColorStop(1,'rgba(90,90,110,0.7)');
         ctx.fillStyle=mg; ctx.fill();
-        // Moon shadow
-        const ms = ctx.createRadialGradient(mx+moon.r*0.3, my+moon.r*0.3, 0, mx, my, moon.r);
-        ms.addColorStop(0.3,'rgba(0,0,0,0)'); ms.addColorStop(1,'rgba(0,0,10,0.65)');
-        ctx.fillStyle=ms; ctx.fill();
       });
     }
-
     ctx.restore();
   });
 }
+
+// ─── LOCALSTORAGE ────────────────────────────────────────────────
 function getScores() {
   try { return JSON.parse(localStorage.getItem('vr_scores') || '[]'); }
   catch { return []; }
@@ -1019,19 +1094,21 @@ function drawPlayer(p, dt) {
 }
 
 // ─── METEORS ─────────────────────────────────────────────────────
-function makeMeteor(size, x, y, vx, vy, fast) {
+function makeMeteor(size, x, y, vx, vy, fast, special) {
   const s = size || (Math.random() * 28 + 22);
   const angle = Math.random() * Math.PI * 2;
   const baseSpeed = (Math.random() * 70 + 40) * (50 / s);
   const speed = fast ? baseSpeed * 2.4 : baseSpeed;
-  const pts = Math.floor(Math.random() * 4 + 7);
+  const pts = special ? Math.floor(Math.random()*5+10) : Math.floor(Math.random() * 4 + 7);
   const shape = [];
   for (let i = 0; i < pts; i++) {
     const a = (i / pts) * Math.PI * 2;
-    const r = s * (0.7 + Math.random() * 0.3);
+    // Crystal meteors have more jagged alternating radii
+    const r = special
+      ? s * (i % 2 === 0 ? (0.5 + Math.random()*0.15) : (0.9 + Math.random()*0.1))
+      : s * (0.7 + Math.random() * 0.3);
     shape.push({a, r});
   }
-  // Fixed light angle per meteor so shading doesn't flicker
   const lightAngle = Math.random() * Math.PI * 2;
   return {
     x: x !== undefined ? x : (Math.random() > 0.5 ? -s : W + s),
@@ -1039,28 +1116,29 @@ function makeMeteor(size, x, y, vx, vy, fast) {
     vx: vx !== undefined ? vx : (Math.cos(angle) * speed),
     vy: vy !== undefined ? vy : (Math.sin(angle) * speed),
     size: s,
-    spin: (Math.random() - 0.5) * (fast ? 3 : 1.5),
+    spin: (Math.random() - 0.5) * (fast ? 3 : special ? 2 : 1.5),
     angle: Math.random() * Math.PI * 2,
-    shape,
-    health: 1,
+    shape, health: 1,
     glowPulse: Math.random() * Math.PI * 2,
     fast: !!fast,
-    lightAngle,           // direction of the "sun" highlight
+    special: !!special,
+    lightAngle,
   };
 }
 
 function spawnMeteor(forceFast) {
-  const fast = forceFast || (Math.random() < 0.20);
-  const s = fast ? (Math.random() * 16 + 12) : (Math.random() * 28 + 22);
-  const speed = (Math.random() * 60 + 40) * (fast ? 2.5 : 1);
-  // Spawn just outside viewport edges (world coords)
-  const side = Math.floor(Math.random() * 4);
+  const rng = Math.random();
+  const fast    = forceFast || (rng < 0.20);
+  const special = !fast && rng > 0.90; // 8% chance (non-fast only)
+  const s = fast ? (Math.random()*16+12) : special ? (Math.random()*20+18) : (Math.random()*28+22);
+  const speed = (Math.random()*78+52) * (fast ? 2.5 : 1);
+  const side = Math.floor(Math.random()*4);
   let x, y, vx, vy;
-  if (side === 0) { x = camera.x - W/2 - s; y = camera.y + (Math.random()-0.5)*H; vx = speed; vy = (Math.random()-0.5)*speed; }
-  else if (side===1){ x = camera.x + W/2 + s; y = camera.y + (Math.random()-0.5)*H; vx = -speed; vy = (Math.random()-0.5)*speed; }
-  else if (side===2){ x = camera.x + (Math.random()-0.5)*W; y = camera.y - H/2 - s; vx = (Math.random()-0.5)*speed; vy = speed; }
-  else              { x = camera.x + (Math.random()-0.5)*W; y = camera.y + H/2 + s; vx = (Math.random()-0.5)*speed; vy = -speed; }
-  meteors.push(makeMeteor(s, x, y, vx, vy, fast));
+  if (side===0){ x=camera.x-W/2-s; y=camera.y+(Math.random()-0.5)*H; vx=speed; vy=(Math.random()-0.5)*speed; }
+  else if(side===1){ x=camera.x+W/2+s; y=camera.y+(Math.random()-0.5)*H; vx=-speed; vy=(Math.random()-0.5)*speed; }
+  else if(side===2){ x=camera.x+(Math.random()-0.5)*W; y=camera.y-H/2-s; vx=(Math.random()-0.5)*speed; vy=speed; }
+  else            { x=camera.x+(Math.random()-0.5)*W; y=camera.y+H/2+s; vx=(Math.random()-0.5)*speed; vy=-speed; }
+  meteors.push(makeMeteor(s, x, y, vx, vy, fast, special));
 }
 
 function splitMeteor(m, impactX, impactY) {
@@ -1072,7 +1150,7 @@ function splitMeteor(m, impactX, impactY) {
   if (childSize >= 8) {
     for (let i = 0; i < count; i++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = Math.random() * 80 + 50;
+      const speed = Math.random() * 104 + 65;
       meteors.push(makeMeteor(childSize, m.x, m.y,
         m.vx * 0.5 + Math.cos(angle) * speed,
         m.vy * 0.5 + Math.sin(angle) * speed,
@@ -1142,127 +1220,96 @@ function drawMeteor(m) {
   m.glowPulse += 0.02;
   const glow = 0.10 + Math.sin(m.glowPulse) * 0.04;
 
-  // Light direction (fixed per meteor, rotates with spin for 3D feel)
-  const la = m.lightAngle + m.angle * 0.4;   // slight co-rotation with spin
+  const {x: wx, y: wy} = wrapAdjust(m.x, m.y);
+
+  const la = m.lightAngle + m.angle * 0.4;
   const lx = Math.cos(la), ly = Math.sin(la);
-  // Highlight offset = 35% of radius toward light
   const hx = lx * m.size * 0.35, hy = ly * m.size * 0.35;
-  // Shadow offset = opposite
   const sx = -lx * m.size * 0.3, sy = -ly * m.size * 0.3;
 
   ctx.save();
-  ctx.translate(m.x, m.y);
+  ctx.translate(wx, wy);
   ctx.rotate(m.angle);
 
-  // ── Outer glow ──
+  // Outer glow
   const glowColor = m.fast
-    ? `rgba(255,60,0,${glow * 1.8})`
-    : `rgba(255,140,60,${glow})`;
-  const glowOuter = m.fast
-    ? `rgba(200,0,0,0)`
-    : `rgba(255,80,0,0)`;
-  const glowR = m.fast ? m.size * 1.5 : m.size * 1.2;
+    ? `rgba(255,60,0,${glow*1.8})`
+    : m.special
+      ? `rgba(80,220,255,${glow*2.0})`
+      : `rgba(255,140,60,${glow})`;
+  const glowR = m.fast ? m.size*1.5 : m.special ? m.size*1.6 : m.size*1.2;
+  const og = ctx.createRadialGradient(0,0,m.size*0.2,0,0,glowR);
+  og.addColorStop(0,glowColor); og.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.beginPath(); ctx.arc(0,0,glowR,0,Math.PI*2); ctx.fillStyle=og; ctx.fill();
 
-  const outerGrd = ctx.createRadialGradient(0, 0, m.size * 0.2, 0, 0, glowR);
-  outerGrd.addColorStop(0, glowColor);
-  outerGrd.addColorStop(1, glowOuter);
+  // Rock shape
   ctx.beginPath();
-  ctx.arc(0, 0, glowR, 0, Math.PI * 2);
-  ctx.fillStyle = outerGrd;
-  ctx.fill();
-
-  // ── Rock shape path (used for fill + clip) ──
-  ctx.beginPath();
-  m.shape.forEach((p, i) => {
-    const nx = Math.cos(p.a) * p.r;
-    const ny = Math.sin(p.a) * p.r;
-    if (i === 0) ctx.moveTo(nx, ny); else ctx.lineTo(nx, ny);
+  m.shape.forEach((p,i) => {
+    const nx=Math.cos(p.a)*p.r, ny=Math.sin(p.a)*p.r;
+    if(i===0) ctx.moveTo(nx,ny); else ctx.lineTo(nx,ny);
   });
   ctx.closePath();
-  ctx.save();
-  ctx.clip();
+  ctx.save(); ctx.clip();
 
-  // ── Base rock color (3D sphere-like gradient) ──
-  const rockGrd = ctx.createRadialGradient(hx, hy, 0, sx * 0.5, sy * 0.5, m.size * 1.1);
+  // Base color
+  const rg = ctx.createRadialGradient(hx,hy,0,sx*0.5,sy*0.5,m.size*1.1);
   if (m.fast) {
-    rockGrd.addColorStop(0,   '#7a2010');   // lit face — deep red
-    rockGrd.addColorStop(0.4, '#4a1008');
-    rockGrd.addColorStop(1,   '#180402');   // shadow — near black
+    rg.addColorStop(0,'#7a2010'); rg.addColorStop(0.4,'#4a1008'); rg.addColorStop(1,'#180402');
+  } else if (m.special) {
+    // Crystal: ice-blue/white
+    rg.addColorStop(0,'#c0f0ff'); rg.addColorStop(0.35,'#4090b0'); rg.addColorStop(1,'#081828');
   } else {
-    rockGrd.addColorStop(0,   '#7a5530');   // lit face — warm brown
-    rockGrd.addColorStop(0.4, '#4a3018');
-    rockGrd.addColorStop(1,   '#180e06');   // shadow — near black
+    rg.addColorStop(0,'#7a5530'); rg.addColorStop(0.4,'#4a3018'); rg.addColorStop(1,'#180e06');
   }
-  ctx.fillStyle = rockGrd;
-  ctx.fillRect(-m.size * 1.5, -m.size * 1.5, m.size * 3, m.size * 3);
+  ctx.fillStyle=rg; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
 
-  // ── Shadow side darkening overlay ──
-  const shadowGrd = ctx.createRadialGradient(sx, sy, 0, sx, sy, m.size * 1.3);
-  shadowGrd.addColorStop(0,   'rgba(0,0,0,0.55)');
-  shadowGrd.addColorStop(0.6, 'rgba(0,0,0,0.2)');
-  shadowGrd.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.fillStyle = shadowGrd;
-  ctx.fillRect(-m.size * 1.5, -m.size * 1.5, m.size * 3, m.size * 3);
+  // Shadow
+  const shd = ctx.createRadialGradient(sx,sy,0,sx,sy,m.size*1.3);
+  shd.addColorStop(0,'rgba(0,0,0,0.55)'); shd.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=shd; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
 
-  // ── Specular highlight (small bright dot on lit side) ──
-  const specR = m.size * 0.35;
-  const specGrd = ctx.createRadialGradient(hx, hy, 0, hx, hy, specR);
-  if (m.fast) {
-    specGrd.addColorStop(0,   'rgba(255,180,120,0.7)');
-    specGrd.addColorStop(0.5, 'rgba(255,80,0,0.2)');
+  // Specular
+  const specR = m.size*0.35;
+  const spg = ctx.createRadialGradient(hx,hy,0,hx,hy,specR);
+  if (m.special) {
+    spg.addColorStop(0,'rgba(255,255,255,0.9)'); spg.addColorStop(0.4,'rgba(150,240,255,0.4)');
+  } else if (m.fast) {
+    spg.addColorStop(0,'rgba(255,180,120,0.7)'); spg.addColorStop(0.5,'rgba(255,80,0,0.2)');
   } else {
-    specGrd.addColorStop(0,   'rgba(255,240,200,0.6)');
-    specGrd.addColorStop(0.5, 'rgba(200,160,80,0.15)');
+    spg.addColorStop(0,'rgba(255,240,200,0.6)'); spg.addColorStop(0.5,'rgba(200,160,80,0.15)');
   }
-  specGrd.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = specGrd;
-  ctx.fillRect(-m.size * 1.5, -m.size * 1.5, m.size * 3, m.size * 3);
+  spg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=spg; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
 
-  // ── Surface detail: fixed cracks (seeded by shape indices) ──
-  ctx.strokeStyle = m.fast ? 'rgba(180,40,10,0.5)' : 'rgba(80,45,15,0.55)';
-  ctx.lineWidth = 0.8;
-  for (let i = 0; i < m.shape.length - 1; i += 3) {
-    const p1 = m.shape[i], p2 = m.shape[(i+2) % m.shape.length];
-    const mid = m.size * 0.25;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(p1.a)*mid, Math.sin(p1.a)*mid);
-    ctx.lineTo(Math.cos(p2.a)*p2.r*0.55, Math.sin(p2.a)*p2.r*0.55);
-    ctx.stroke();
-  }
-
-  ctx.restore(); // end clip
-
-  // ── Outline ──
-  ctx.beginPath();
-  m.shape.forEach((p, i) => {
-    const nx = Math.cos(p.a) * p.r;
-    const ny = Math.sin(p.a) * p.r;
-    if (i === 0) ctx.moveTo(nx, ny); else ctx.lineTo(nx, ny);
-  });
-  ctx.closePath();
-  if (m.fast) {
-    ctx.strokeStyle = 'rgba(255,80,30,0.8)';
-    ctx.lineWidth = 1.2;
-  } else {
-    ctx.strokeStyle = 'rgba(180,120,60,0.55)';
-    ctx.lineWidth = 1;
-  }
-  ctx.stroke();
-
-  // Rim light on lit edge (thin bright line)
-  ctx.beginPath();
-  m.shape.forEach((pt, i) => {
-    const dot = Math.cos(pt.a) * lx + Math.sin(pt.a) * ly;
-    if (dot > 0.4) {
-      const nx = Math.cos(pt.a) * pt.r;
-      const ny = Math.sin(pt.a) * pt.r;
-      if (i === 0) ctx.moveTo(nx, ny); else ctx.lineTo(nx, ny);
+  // Crystal facet lines for special
+  if (m.special) {
+    ctx.strokeStyle='rgba(150,240,255,0.45)'; ctx.lineWidth=0.8;
+    for (let i=0; i<m.shape.length-1; i+=2) {
+      const p1=m.shape[i], p2=m.shape[(i+2)%m.shape.length];
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(p1.a)*p1.r*0.15,Math.sin(p1.a)*p1.r*0.15);
+      ctx.lineTo(Math.cos(p2.a)*p2.r*0.6,Math.sin(p2.a)*p2.r*0.6);
+      ctx.stroke();
     }
+  } else {
+    ctx.strokeStyle=m.fast?'rgba(180,40,10,0.5)':'rgba(80,45,15,0.55)'; ctx.lineWidth=0.8;
+    for(let i=0;i<m.shape.length-1;i+=3){
+      const p1=m.shape[i],p2=m.shape[(i+2)%m.shape.length];
+      ctx.beginPath(); ctx.moveTo(Math.cos(p1.a)*m.size*0.25,Math.sin(p1.a)*m.size*0.25);
+      ctx.lineTo(Math.cos(p2.a)*p2.r*0.55,Math.sin(p2.a)*p2.r*0.55); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // Outline
+  ctx.beginPath();
+  m.shape.forEach((p,i)=>{
+    const nx=Math.cos(p.a)*p.r, ny=Math.sin(p.a)*p.r;
+    if(i===0) ctx.moveTo(nx,ny); else ctx.lineTo(nx,ny);
   });
-  ctx.strokeStyle = m.fast
-    ? 'rgba(255,150,80,0.45)'
-    : 'rgba(220,180,100,0.35)';
-  ctx.lineWidth = 1.5;
+  ctx.closePath();
+  ctx.strokeStyle = m.fast ? 'rgba(255,80,30,0.8)' : m.special ? 'rgba(100,220,255,0.9)' : 'rgba(180,120,60,0.55)';
+  ctx.lineWidth = m.special ? 1.4 : 1;
   ctx.stroke();
 
   ctx.restore();
@@ -1359,6 +1406,189 @@ function spawnDeathExplosion(x, y) {
   }
 }
 
+// ─── ALIEN SHIPS ─────────────────────────────────────────────────
+function spawnAlien() {
+  if (aliens.length >= 4) return;
+  const side = Math.floor(Math.random()*4);
+  let x, y;
+  if (side===0){ x=camera.x-W/2-80; y=camera.y+(Math.random()-0.5)*H; }
+  else if(side===1){ x=camera.x+W/2+80; y=camera.y+(Math.random()-0.5)*H; }
+  else if(side===2){ x=camera.x+(Math.random()-0.5)*W; y=camera.y-H/2-80; }
+  else            { x=camera.x+(Math.random()-0.5)*W; y=camera.y+H/2+80; }
+
+  // Elliptical orbit parameters
+  const orbitRx  = 120 + Math.random()*200;
+  const orbitRy  = 60  + Math.random()*120;
+  const orbitSpd = (0.55 + Math.random()*0.8) * (Math.random()>0.5?1:-1) * 1.3;
+  const orbitTilt= Math.random()*Math.PI*2;
+
+  aliens.push({
+    x, y,
+    orbitCx: x, orbitCy: y,       // ellipse center (drifts toward player)
+    orbitRx, orbitRy, orbitTilt,
+    orbitAngle: Math.random()*Math.PI*2,
+    orbitSpeed: orbitSpd,
+    spinAngle: 0,
+    glowPulse: Math.random()*Math.PI*2,
+    radius: 24,
+    shootCooldown: 3 + Math.random()*4,
+    // Random perturbation seeds for unpredictable drift
+    pertSeedX: Math.random()*100,
+    pertSeedY: Math.random()*100,
+  });
+}
+
+function updateAliens(dt) {
+  aliens.forEach(a => {
+    // Orbit center drifts toward player + random perturbation
+    const dx = player.x - a.orbitCx, dy = player.y - a.orbitCy;
+    const dist = Math.sqrt(dx*dx+dy*dy) || 1;
+    const driftSpd = 26;
+    const t = elapsed;
+    a.orbitCx += (dx/dist)*driftSpd*dt + Math.sin(t*1.7+a.pertSeedX)*40*dt;
+    a.orbitCy += (dy/dist)*driftSpd*dt + Math.cos(t*1.3+a.pertSeedY)*40*dt;
+
+    // Advance ellipse angle (imprevedibile: random speed bursts)
+    const burstFactor = 1 + Math.sin(t*2.1+a.pertSeedX)*0.5;
+    a.orbitAngle += a.orbitSpeed * burstFactor * dt;
+
+    // Compute position on tilted ellipse
+    const ex = Math.cos(a.orbitAngle)*a.orbitRx;
+    const ey = Math.sin(a.orbitAngle)*a.orbitRy;
+    a.x = a.orbitCx + Math.cos(a.orbitTilt)*ex - Math.sin(a.orbitTilt)*ey;
+    a.y = a.orbitCy + Math.sin(a.orbitTilt)*ex + Math.cos(a.orbitTilt)*ey;
+
+    a.spinAngle += dt*2.8; a.glowPulse += dt*3;
+
+    // Laser shooting
+    a.shootCooldown -= dt;
+    if (a.shootCooldown <= 0) {
+      a.shootCooldown = 3.5 + Math.random()*5;
+      const ang = Math.atan2(player.y - a.y, player.x - a.x);
+      alienBullets.push({
+        x: a.x, y: a.y,
+        vx: Math.cos(ang)*780, vy: Math.sin(ang)*780,
+        angle: ang,
+        life: 1, maxLife: 2.2,
+      });
+    }
+  });
+}
+
+function drawAliens() {
+  aliens.forEach(a => {
+    const {x: wx, y: wy} = wrapAdjust(a.x, a.y);
+    const pulse = 0.18 + Math.sin(a.glowPulse)*0.08;
+    ctx.save(); ctx.translate(wx, wy);
+    const og=ctx.createRadialGradient(0,0,0,0,0,48);
+    og.addColorStop(0,`rgba(0,255,90,${pulse})`); og.addColorStop(1,'rgba(0,255,90,0)');
+    ctx.beginPath(); ctx.arc(0,0,48,0,Math.PI*2); ctx.fillStyle=og; ctx.fill();
+    ctx.save(); ctx.scale(1,0.32);
+    const bd=ctx.createRadialGradient(-8,-8,0,0,0,24);
+    bd.addColorStop(0,'rgba(50,100,60,0.95)'); bd.addColorStop(1,'rgba(10,50,20,0.85)');
+    ctx.beginPath(); ctx.arc(0,0,24,0,Math.PI*2); ctx.fillStyle=bd; ctx.fill();
+    ctx.strokeStyle='rgba(0,255,80,0.75)'; ctx.lineWidth=2; ctx.stroke();
+    ctx.restore();
+    for(let i=0;i<8;i++){
+      const la=a.spinAngle+i*Math.PI/4;
+      ctx.beginPath(); ctx.arc(Math.cos(la)*20,Math.sin(la)*6.4,2.8,0,Math.PI*2);
+      ctx.fillStyle=i%2===0?'rgba(0,255,100,0.95)':'rgba(200,255,100,0.85)'; ctx.fill();
+    }
+    ctx.save(); ctx.scale(1,0.85);
+    ctx.beginPath(); ctx.arc(0,-5,13,Math.PI,0); ctx.closePath();
+    const dm=ctx.createRadialGradient(-4,-14,0,0,-5,13);
+    dm.addColorStop(0,'rgba(160,255,190,0.75)'); dm.addColorStop(1,'rgba(0,80,30,0.3)');
+    ctx.fillStyle=dm; ctx.fill(); ctx.strokeStyle='rgba(0,255,80,0.5)'; ctx.lineWidth=0.9; ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(-3,-14,5,3,Math.PI*0.3,0,Math.PI*2);
+    ctx.fillStyle='rgba(255,255,255,0.38)'; ctx.fill();
+    ctx.restore();
+    ctx.restore();
+  });
+}
+
+function updateAndDrawAlienBullets(dt) {
+  alienBullets = alienBullets.filter(b => {
+    b.x += b.vx * dt; b.y += b.vy * dt;
+    b.life -= dt / b.maxLife;
+    if (b.life <= 0) return false;
+
+    // Hit player
+    const dx = b.x - player.x, dy = b.y - player.y;
+    if (Math.sqrt(dx*dx+dy*dy) < player.radius + 5) {
+      spawnDeathExplosion(player.x, player.y);
+      state = 'dead'; showGameOver();
+      return false;
+    }
+
+    // Cull off-viewport
+    const margin = 250;
+    if (b.x < camera.x-W/2-margin || b.x > camera.x+W/2+margin ||
+        b.y < camera.y-H/2-margin || b.y > camera.y+H/2+margin) return false;
+
+    // Draw laser bolt (already under world transform)
+    const alpha = Math.min(1, b.life * 2.5);
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.angle);
+
+    // Outer glow — red
+    const og = ctx.createRadialGradient(0,0,0,0,0,9);
+    og.addColorStop(0,`rgba(255,50,0,${alpha*0.45})`); og.addColorStop(1,'rgba(255,30,0,0)');
+    ctx.beginPath(); ctx.arc(0,0,9,0,Math.PI*2); ctx.fillStyle=og; ctx.fill();
+
+    // Core beam
+    const bg = ctx.createLinearGradient(-14,0,5,0);
+    bg.addColorStop(0,'rgba(255,50,0,0)');
+    bg.addColorStop(0.3,`rgba(255,140,0,${alpha*0.8})`);
+    bg.addColorStop(1,`rgba(255,240,200,${alpha})`);
+    ctx.beginPath(); ctx.roundRect(-14,-2.2,19,4.4,2); ctx.fillStyle=bg; ctx.fill();
+
+    // Tip
+    ctx.beginPath(); ctx.arc(4,0,2.8,0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,255,220,${alpha})`; ctx.fill();
+
+    ctx.restore();
+    return true;
+  });
+}
+
+function checkAlienCollisions() {
+  // Bullet → alien
+  const toKill = new Set();
+  bullets = bullets.filter(b => {
+    for(let i=0;i<aliens.length;i++){
+      if(toKill.has(i)) continue;
+      const a=aliens[i];
+      const dx=b.x-a.x, dy=b.y-a.y;
+      if(Math.sqrt(dx*dx+dy*dy)<a.radius+4){
+        score+=20;
+        for(let j=0;j<30;j++){
+          const ang=Math.random()*Math.PI*2, sp=Math.random()*200+50;
+          particles.push({x:a.x,y:a.y,vx:Math.cos(ang)*sp,vy:Math.sin(ang)*sp,
+            life:1,maxLife:Math.random()*0.8+0.3,size:Math.random()*5+1,
+            color:j%2===0?'#00ff60':'#ccff44'});
+        }
+        toKill.add(i); return false;
+      }
+    }
+    return true;
+  });
+  if(toKill.size>0) aliens=aliens.filter((_,i)=>!toKill.has(i));
+  // Player → alien
+  for(const a of aliens){
+    const dx=player.x-a.x, dy=player.y-a.y;
+    if(Math.sqrt(dx*dx+dy*dy)<player.radius+a.radius*0.8){
+      spawnDeathExplosion(player.x,player.y);
+      state='dead'; showGameOver(); return;
+    }
+  }
+}
+
+function checkCollision(p, m) {
+  const dx = p.x - m.x, dy = p.y - m.y;
+  return Math.sqrt(dx*dx + dy*dy) < p.radius + m.size * 0.78;
+}
+
 let mouseX = 0, mouseY = 0;
 canvas.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
 canvas.addEventListener('mousedown', e => {
@@ -1394,7 +1624,7 @@ function beamSplit(m, bx, by) {
   if (childSize < 8) return;
   const perpA = Math.atan2(by - m.y, bx - m.x) + Math.PI / 2;
   [1, -1].forEach(dir => {
-    const sp = 35 + Math.random() * 35;
+    const sp = 46 + Math.random() * 46;
     meteors.push(makeMeteor(childSize, m.x, m.y,
       m.vx + Math.cos(perpA) * sp * dir,
       m.vy + Math.sin(perpA) * sp * dir,
@@ -1434,14 +1664,14 @@ function updateAndDrawBullets(dt) {
           spawnBulletHit(b.x, b.y, m.fast);
           splitMeteor(m, b.x, b.y);
           toDestroy.add(i);
-          score += m.fast ? 5 : 3;
+          score += m.special ? 7 : (m.fast ? 5 : 3);
           b.pierces--;
           if (b.pierces < 0) return false;
         } else {
           spawnBulletHit(b.x, b.y, m.fast);
           splitMeteor(m, b.x, b.y);
           toDestroy.add(i);
-          score += m.fast ? 5 : 3;
+          score += m.special ? 7 : (m.fast ? 5 : 3);
           return false;
         }
       }
@@ -1525,10 +1755,6 @@ function spawnBulletHit(x, y, fast) {
       color: fast ? '#ff6020' : '#00f5ff',
     });
   }
-}
-function checkCollision(p, m) {
-  const dx = p.x - m.x, dy = p.y - m.y;
-  return Math.sqrt(dx*dx + dy*dy) < p.radius + m.size * 0.78;
 }
 
 // ─── INPUT ───────────────────────────────────────────────────────
@@ -1628,12 +1854,11 @@ function updatePlayer(p, dt) {
   p.vx *= drag; p.vy *= drag;
   p.x += p.vx * dt; p.y += p.vy * dt;
 
-  // Clamp to world boundaries (soft bounce at edges)
-  const pad = 80;
-  if (p.x < pad)         { p.x = pad;         p.vx = Math.abs(p.vx) * 0.4; }
-  if (p.x > WORLD_W-pad) { p.x = WORLD_W-pad; p.vx = -Math.abs(p.vx) * 0.4; }
-  if (p.y < pad)         { p.y = pad;         p.vy = Math.abs(p.vy) * 0.4; }
-  if (p.y > WORLD_H-pad) { p.y = WORLD_H-pad; p.vy = -Math.abs(p.vy) * 0.4; }
+  // Toroidal wrap — camera adjusts so relative position is maintained
+  if (p.x < 0)         { p.x += WORLD_W; camera.x += WORLD_W; }
+  if (p.x >= WORLD_W)  { p.x -= WORLD_W; camera.x -= WORLD_W; }
+  if (p.y < 0)         { p.y += WORLD_H; camera.y += WORLD_H; }
+  if (p.y >= WORLD_H)  { p.y -= WORLD_H; camera.y -= WORLD_H; }
 }
 
 // ─── FORMAT TIME ─────────────────────────────────────────────────
@@ -1740,27 +1965,37 @@ function gameLoop(ts) {
 
     // Update player
     updatePlayer(player, dt);
+    updateAliens(dt);
 
     // ── Apply world→screen camera transform for all game objects ──
     ctx.save();
     ctx.translate(W/2 - camera.x, H/2 - camera.y);
 
-    drawSpaceObjects();   // planets, galaxies, moons
+    drawSpaceObjects();
     drawParticles(dt);
     meteors.forEach(m => drawMeteor(m));
     updateAndDrawBullets(dt);
+    drawAliens();
     drawPlayer(player, dt);
 
     ctx.restore();
 
-    // Collision (world coords, no transform needed)
+    // Meteor-player collision
     for (const m of meteors) {
       if (checkCollision(player, m)) {
         spawnDeathExplosion(player.x, player.y);
-        state = 'dead';
-        showGameOver();
-        break;
+        state = 'dead'; showGameOver(); break;
       }
+    }
+
+    // Alien collisions (bullets + player-contact)
+    if (state === 'playing') checkAlienCollisions();
+
+    // Alien spawn (every ~22s after 15s elapsed, max 3)
+    alienSpawnTimer += dt;
+    if (alienSpawnTimer > 22 && elapsed > 15) {
+      alienSpawnTimer = 0;
+      spawnAlien();
     }
 
     // HUD
@@ -1952,6 +2187,8 @@ function startGame() {
   particles = [];
   thrustParticles = [];
   bullets = [];
+  aliens = [];
+  alienSpawnTimer = 0;
   initWorld();
 
   // Initial meteors
