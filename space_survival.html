@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VOID RUNNER — Sopravvivi al cosmo</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --cyan: #00f5ff;
+    --cyan-dim: rgba(0,245,255,0.15);
+    --orange: #ff6b35;
+    --gold: #ffd700;
+    --bg: #03070f;
+    --panel: rgba(0,20,40,0.85);
+    --border: rgba(0,245,255,0.3);
+    --text: #c8e8f8;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+  }
+
+  canvas { display: block; }
+
+  #ui-overlay {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+    z-index: 10;
+  }
+
+  .hud {
+    position: fixed;
+    top: 18px; left: 50%;
+    transform: translateX(-50%);
+    display: flex; gap: 40px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    color: var(--cyan);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 28px;
+    pointer-events: none;
+    z-index: 20;
+    backdrop-filter: blur(8px);
+    text-shadow: 0 0 8px var(--cyan);
+  }
+
+  .hud span { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+  .hud small { font-size: 9px; opacity: 0.55; letter-spacing: 0.2em; }
+  .hud b { font-size: 20px; font-weight: 900; }
+
+  /* ──── SCREENS ──── */
+  .screen {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 0;
+    z-index: 30;
+    background: radial-gradient(ellipse at center, rgba(0,30,60,0.7) 0%, rgba(3,7,15,0.95) 100%);
+    backdrop-filter: blur(4px);
+  }
+
+  .screen.hidden { display: none; }
+
+  .logo {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    font-size: clamp(36px, 8vw, 72px);
+    color: var(--cyan);
+    text-shadow: 0 0 20px var(--cyan), 0 0 60px rgba(0,245,255,0.4);
+    letter-spacing: 0.15em;
+    line-height: 1;
+    text-align: center;
+  }
+
+  .sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: rgba(200,232,248,0.5);
+    letter-spacing: 0.3em;
+    margin-top: 8px;
+    text-align: center;
+  }
+
+  .divider {
+    width: 320px;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    margin: 32px 0;
+    opacity: 0.5;
+  }
+
+  .prev-record {
+    font-size: 13px;
+    color: var(--gold);
+    letter-spacing: 0.15em;
+    text-align: center;
+    margin-bottom: 24px;
+    min-height: 20px;
+    text-shadow: 0 0 10px var(--gold);
+  }
+
+  .btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--bg);
+    background: var(--cyan);
+    border: none;
+    border-radius: 3px;
+    padding: 14px 48px;
+    cursor: pointer;
+    text-transform: uppercase;
+    box-shadow: 0 0 20px rgba(0,245,255,0.5);
+    transition: all 0.15s;
+    pointer-events: all;
+  }
+
+  .btn:hover {
+    background: #fff;
+    box-shadow: 0 0 35px rgba(0,245,255,0.9);
+    transform: translateY(-2px);
+  }
+
+  .btn:active { transform: translateY(0); }
+
+  .controls-hint {
+    font-size: 11px;
+    color: rgba(200,232,248,0.35);
+    letter-spacing: 0.18em;
+    margin-top: 20px;
+    text-align: center;
+    line-height: 1.9;
+  }
+
+  /* ──── GAME OVER ──── */
+  .final-time {
+    font-family: 'Orbitron', sans-serif;
+    font-size: clamp(48px, 12vw, 96px);
+    font-weight: 900;
+    color: var(--orange);
+    text-shadow: 0 0 30px rgba(255,107,53,0.7);
+    margin: 8px 0 0;
+    letter-spacing: 0.05em;
+  }
+
+  .final-label {
+    font-size: 11px;
+    letter-spacing: 0.35em;
+    color: rgba(200,232,248,0.4);
+    margin-bottom: 4px;
+  }
+
+  .record-badge {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px;
+    letter-spacing: 0.25em;
+    color: var(--gold);
+    text-shadow: 0 0 10px var(--gold);
+    margin-top: 8px;
+    min-height: 18px;
+  }
+
+  .name-row {
+    display: flex; gap: 10px;
+    align-items: center;
+    margin-top: 28px;
+    pointer-events: all;
+  }
+
+  .name-row input {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    background: rgba(0,245,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--cyan);
+    padding: 10px 16px;
+    width: 200px;
+    outline: none;
+    letter-spacing: 0.1em;
+    transition: border-color 0.2s;
+  }
+
+  .name-row input::placeholder { color: rgba(0,245,255,0.3); }
+  .name-row input:focus { border-color: var(--cyan); box-shadow: 0 0 10px rgba(0,245,255,0.3); }
+
+  .btn-sm {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.15em;
+    color: var(--bg); background: var(--cyan);
+    border: none; border-radius: 3px;
+    padding: 11px 22px; cursor: pointer;
+    box-shadow: 0 0 14px rgba(0,245,255,0.4);
+    transition: all 0.15s;
+    pointer-events: all;
+  }
+  .btn-sm:hover { background: #fff; transform: translateY(-1px); }
+
+  /* Leaderboard */
+  .lb-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px; letter-spacing: 0.35em;
+    color: rgba(200,232,248,0.35);
+    margin-top: 36px; margin-bottom: 12px;
+  }
+
+  .lb-list {
+    list-style: none;
+    width: 300px;
+    max-height: 160px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    background: rgba(0,20,40,0.6);
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .lb-list li {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 14px;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(0,245,255,0.06);
+    transition: background 0.1s;
+  }
+  .lb-list li:last-child { border-bottom: none; }
+  .lb-list li:first-child { color: var(--gold); }
+  .lb-list li .rank { color: rgba(200,232,248,0.3); font-size: 10px; margin-right: 10px; }
+  .lb-list li .name { flex: 1; }
+  .lb-list li .score { color: var(--cyan); }
+
+  /* Mobile touch controls */
+  #touch-controls {
+    position: fixed; bottom: 30px;
+    display: none;
+    gap: 12px;
+    z-index: 25;
+    pointer-events: all;
+  }
+
+  .touch-btn {
+    width: 64px; height: 64px;
+    border-radius: 50%;
+    background: rgba(0,245,255,0.1);
+    border: 2px solid var(--border);
+    color: var(--cyan);
+    font-size: 22px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    transition: background 0.1s;
+    user-select: none;
+  }
+  .touch-btn:active { background: rgba(0,245,255,0.25); }
+
+  @media (max-width: 600px) {
+    #touch-controls { display: flex; }
+    canvas { position: fixed; top: 0; left: 0; }
+  }
+
+  /* Scanline overlay */
+  body::after {
+    content: '';
+    position: fixed; inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.04) 2px,
+      rgba(0,0,0,0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 50;
+  }
+
+  /* Anim */
+  @keyframes flicker {
+    0%,100% { opacity:1; }
+    92% { opacity:1; }
+    93% { opacity:0.85; }
+    94% { opacity:1; }
+    97% { opacity:0.9; }
+    98% { opacity:1; }
+  }
+
+  .logo { animation: flicker 8s infinite; }
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<!-- HUD -->
+<div class="hud" id="hud" style="display:none;">
+  <span><small>TEMPO</small><b id="hud-time">0:00</b></span>
+  <span><small>METEORE</small><b id="hud-count">0</b></span>
+  <span><small>BOOST</small>
+    <span id="boost-bar-wrap" style="display:flex;align-items:center;height:20px;gap:3px;">
+      <span id="boost-bar" style="display:block;width:52px;height:6px;border-radius:3px;background:linear-gradient(90deg,#ffe040,#ff9000);border:1px solid rgba(255,220,0,0.4);transition:width 0.05s;"></span>
+    </span>
+  </span>
+  <span><small>BEST</small><b id="hud-best">--:--</b></span>
+</div>
+
+<!-- START SCREEN -->
+<div class="screen" id="screen-start">
+  <div class="logo">VOID RUNNER</div>
+  <div class="sub">SOPRAVVIVI AL COSMO</div>
+  <div class="divider"></div>
+  <div class="prev-record" id="prev-record"></div>
+  <button class="btn" onclick="startGame()">INIZIA MISSIONE</button>
+  <div class="controls-hint">
+    ↑ ↓ ← → oppure W A S D per muoverti<br>
+    SPAZIO per accelerare (boost)<br>
+    Schiva i meteoriti · Sopravvivi più a lungo possibile
+  </div>
+</div>
+
+<!-- GAME OVER SCREEN -->
+<div class="screen hidden" id="screen-over">
+  <div class="logo" style="font-size:clamp(24px,5vw,42px);color:var(--orange);text-shadow:0 0 20px rgba(255,107,53,0.8);">DISTRUTTO</div>
+  <div class="sub" style="margin-top:10px;">FINE MISSIONE</div>
+  <div class="divider"></div>
+  <div class="final-label">SEI SOPRAVVISSUTO PER</div>
+  <div class="final-time" id="final-time">0:00</div>
+  <div class="record-badge" id="record-badge"></div>
+
+  <div class="name-row">
+    <input type="text" id="player-name" maxlength="16" placeholder="Il tuo nome..." autocomplete="off" spellcheck="false">
+    <button class="btn-sm" onclick="saveScore()">SALVA</button>
+  </div>
+
+  <div class="lb-title">CLASSIFICA</div>
+  <ul class="lb-list" id="lb-list"></ul>
+
+  <div style="margin-top:28px; pointer-events:all;">
+    <button class="btn" onclick="startGame()">RIPROVA</button>
+  </div>
+</div>
+
+<!-- Touch controls -->
+<div id="touch-controls">
+  <div class="touch-btn" id="t-left">◀</div>
+  <div class="touch-btn" id="t-up">▲</div>
+  <div class="touch-btn" id="t-down">▼</div>
+  <div class="touch-btn" id="t-right">▶</div>
+</div>
+
+<script>
+// ─── CANVAS SETUP ───────────────────────────────────────────────
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() {
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+// ─── GAME STATE ──────────────────────────────────────────────────
+let state = 'start'; // start | playing | dead
+let elapsed = 0;
+let lastTime = 0;
+let animId;
+let player, meteors, particles, stars, thrustParticles;
+let meteorSpawnTimer = 0, meteorSpawnInterval = 2.2;
+let splitTimer = 0, splitInterval = 5;
+let savedName = localStorage.getItem('vr_name') || '';
+
+// ─── LOCALSTORAGE ────────────────────────────────────────────────
+function getScores() {
+  try { return JSON.parse(localStorage.getItem('vr_scores') || '[]'); }
+  catch { return []; }
+}
+function saveScores(arr) {
+  localStorage.setItem('vr_scores', JSON.stringify(arr));
+}
+
+// ─── STARS ───────────────────────────────────────────────────────
+function makeStar() {
+  return {
+    x: Math.random() * W,
+    y: Math.random() * H,
+    r: Math.random() * 1.4 + 0.2,
+    brightness: Math.random(),
+    twinkle: Math.random() * Math.PI * 2,
+    speed: Math.random() * 0.1 + 0.02,
+  };
+}
+
+function initStars() {
+  stars = Array.from({length: 200}, makeStar);
+}
+
+function drawStars(dt) {
+  stars.forEach(s => {
+    s.twinkle += dt * 1.2;
+    const alpha = 0.3 + s.brightness * 0.5 + Math.sin(s.twinkle) * 0.2;
+    ctx.beginPath();
+    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(200,230,255,${alpha})`;
+    ctx.fill();
+  });
+}
+
+// ─── PLAYER ──────────────────────────────────────────────────────
+function makePlayer() {
+  return {
+    x: W / 2, y: H / 2,
+    vx: 0, vy: 0,
+    angle: -Math.PI / 2,
+    targetAngle: -Math.PI / 2,
+    radius: 13,
+    speed: 240,
+    alive: true,
+    thrustOn: false,
+    boosting: false,
+    boostCharge: 1,      // 0..1
+    boostDraining: false,
+  };
+}
+
+function drawPlayer(p, dt) {
+  const x = p.x, y = p.y, a = p.angle;
+  const cos = Math.cos(a), sin = Math.sin(a);
+
+  // Thrust particles (more & brighter when boosting)
+  if (p.thrustOn && state === 'playing') {
+    const count = p.boosting ? 7 : 3;
+    for (let i = 0; i < count; i++) {
+      const spread = p.boosting ? 10 : 7;
+      const spd    = p.boosting ? (120 + Math.random() * 160) : (60 + Math.random() * 80);
+      thrustParticles.push({
+        x: x - cos * 11 + (Math.random() - 0.5) * spread,
+        y: y - sin * 11 + (Math.random() - 0.5) * spread,
+        vx: (-cos * spd + (Math.random() - 0.5) * 60),
+        vy: (-sin * spd + (Math.random() - 0.5) * 60),
+        life: 1,
+        size: p.boosting ? Math.random() * 6 + 2 : Math.random() * 4 + 1,
+        hue: p.boosting ? (Math.random() > 0.3 ? 55 : 200) : (Math.random() > 0.5 ? 35 : 200),
+      });
+    }
+  }
+
+  // Boost shockwave ring
+  if (p.boosting && state === 'playing') {
+    const ring = 0.5 + Math.sin(Date.now() * 0.015) * 0.5;
+    ctx.beginPath();
+    ctx.arc(x, y, 18 + ring * 8, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255,220,0,${0.15 + ring * 0.15})`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  // Glow aura
+  const auraR = p.boosting ? 26 : 22;
+  const auraColor = p.boosting ? 'rgba(255,200,0,0.22)' : 'rgba(0,245,255,0.18)';
+  const grd = ctx.createRadialGradient(x, y, 0, x, y, auraR);
+  grd.addColorStop(0, auraColor);
+  grd.addColorStop(1, 'rgba(0,245,255,0)');
+  ctx.beginPath();
+  ctx.arc(x, y, auraR, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(a + Math.PI / 2);
+  ctx.scale(0.83, 0.83);   // ← makes ship ~15% smaller
+
+  // Body
+  ctx.beginPath();
+  ctx.moveTo(0, -20);
+  ctx.lineTo(12, 14);
+  ctx.lineTo(6, 8);
+  ctx.lineTo(0, 12);
+  ctx.lineTo(-6, 8);
+  ctx.lineTo(-12, 14);
+  ctx.closePath();
+  ctx.fillStyle = '#0a2a3a';
+  ctx.strokeStyle = p.boosting ? '#ffe040' : '#00f5ff';
+  ctx.lineWidth = 1.5;
+  ctx.fill();
+  ctx.stroke();
+
+  // Cockpit
+  ctx.beginPath();
+  ctx.ellipse(0, -6, 4, 7, 0, 0, Math.PI * 2);
+  ctx.fillStyle = p.boosting ? 'rgba(255,220,80,0.7)' : 'rgba(0,245,255,0.5)';
+  ctx.fill();
+
+  // Left wing
+  ctx.beginPath();
+  ctx.moveTo(-6, 4);
+  ctx.lineTo(-16, 14);
+  ctx.lineTo(-10, 6);
+  ctx.closePath();
+  ctx.fillStyle = '#052535';
+  ctx.strokeStyle = p.boosting ? 'rgba(255,200,0,0.7)' : 'rgba(0,245,255,0.6)';
+  ctx.lineWidth = 1;
+  ctx.fill(); ctx.stroke();
+
+  // Right wing
+  ctx.beginPath();
+  ctx.moveTo(6, 4);
+  ctx.lineTo(16, 14);
+  ctx.lineTo(10, 6);
+  ctx.closePath();
+  ctx.fill(); ctx.stroke();
+
+  // Engine flame
+  if (p.thrustOn) {
+    const flameH = p.boosting ? 9 + Math.random() * 6 : 3;
+    ctx.beginPath();
+    ctx.ellipse(0, 13, p.boosting ? 7 : 4, flameH, 0, 0, Math.PI * 2);
+    ctx.fillStyle = p.boosting ? `rgba(255,220,0,0.95)` : `rgba(255,140,0,0.9)`;
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ─── METEORS ─────────────────────────────────────────────────────
+function makeMeteor(size, x, y, vx, vy) {
+  const s = size || (Math.random() * 28 + 22);
+  const angle = Math.random() * Math.PI * 2;
+  const speed = (Math.random() * 70 + 40) * (50 / s);
+  const pts = Math.floor(Math.random() * 4 + 7);
+  const shape = [];
+  for (let i = 0; i < pts; i++) {
+    const a = (i / pts) * Math.PI * 2;
+    const r = s * (0.7 + Math.random() * 0.3);
+    shape.push({a, r});
+  }
+  return {
+    x: x !== undefined ? x : (Math.random() > 0.5 ? -s : W + s),
+    y: y !== undefined ? y : (Math.random() * H),
+    vx: vx !== undefined ? vx : (Math.cos(angle) * speed),
+    vy: vy !== undefined ? vy : (Math.sin(angle) * speed),
+    size: s,
+    spin: (Math.random() - 0.5) * 1.5,
+    angle: Math.random() * Math.PI * 2,
+    shape,
+    health: 1,
+    glowPulse: Math.random() * Math.PI * 2,
+  };
+}
+
+function spawnMeteor() {
+  const side = Math.floor(Math.random() * 4);
+  let x, y, vx, vy;
+  const s = Math.random() * 28 + 22;
+  const speed = Math.random() * 60 + 40;
+  if (side === 0) { x = -s; y = Math.random() * H; vx = speed; vy = (Math.random()-0.5)*speed; }
+  else if (side === 1) { x = W+s; y = Math.random() * H; vx = -speed; vy = (Math.random()-0.5)*speed; }
+  else if (side === 2) { x = Math.random()*W; y = -s; vx = (Math.random()-0.5)*speed; vy = speed; }
+  else { x = Math.random()*W; y = H+s; vx = (Math.random()-0.5)*speed; vy = -speed; }
+  meteors.push(makeMeteor(s, x, y, vx, vy));
+}
+
+function splitMeteor(m) {
+  const count = Math.floor(Math.random() * 2 + 2);
+  const childSize = m.size * 0.48;
+  if (childSize < 8) return;
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = Math.random() * 80 + 50;
+    meteors.push(makeMeteor(childSize, m.x, m.y,
+      m.vx * 0.5 + Math.cos(angle) * speed,
+      m.vy * 0.5 + Math.sin(angle) * speed
+    ));
+  }
+  // Explosion particles
+  for (let i = 0; i < 22; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = Math.random() * 180 + 40;
+    particles.push({
+      x: m.x, y: m.y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life: 1,
+      maxLife: Math.random() * 0.8 + 0.3,
+      size: Math.random() * 5 + 1,
+      color: Math.random() > 0.5 ? '#ff8c00' : '#ff4444',
+    });
+  }
+}
+
+function drawMeteor(m) {
+  m.glowPulse += 0.02;
+  const glow = 0.12 + Math.sin(m.glowPulse) * 0.05;
+
+  ctx.save();
+  ctx.translate(m.x, m.y);
+  ctx.rotate(m.angle);
+
+  // Glow
+  const grd = ctx.createRadialGradient(0, 0, m.size * 0.3, 0, 0, m.size * 1.2);
+  grd.addColorStop(0, `rgba(255,140,60,${glow})`);
+  grd.addColorStop(1, 'rgba(255,80,0,0)');
+  ctx.beginPath();
+  ctx.arc(0, 0, m.size * 1.2, 0, Math.PI * 2);
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  // Rock
+  ctx.beginPath();
+  m.shape.forEach((p, i) => {
+    const nx = Math.cos(p.a) * p.r;
+    const ny = Math.sin(p.a) * p.r;
+    if (i === 0) ctx.moveTo(nx, ny); else ctx.lineTo(nx, ny);
+  });
+  ctx.closePath();
+
+  const rockGrd = ctx.createRadialGradient(-m.size*0.3, -m.size*0.3, 0, 0, 0, m.size);
+  rockGrd.addColorStop(0, '#6a4a2a');
+  rockGrd.addColorStop(0.5, '#3d2a15');
+  rockGrd.addColorStop(1, '#1a100a');
+  ctx.fillStyle = rockGrd;
+  ctx.fill();
+  ctx.strokeStyle = 'rgba(180,120,60,0.6)';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  // Surface cracks
+  ctx.strokeStyle = 'rgba(100,60,20,0.5)';
+  ctx.lineWidth = 0.7;
+  for (let i = 0; i < 3; i++) {
+    const a1 = Math.random() * Math.PI * 2;
+    const len = m.size * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(a1)*len*0.2, Math.sin(a1)*len*0.2);
+    ctx.lineTo(Math.cos(a1)*len, Math.sin(a1)*len);
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+// ─── PARTICLES ───────────────────────────────────────────────────
+function drawParticles(dt) {
+  particles = particles.filter(p => {
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= 0.96; p.vy *= 0.96;
+    p.life -= dt / (p.maxLife || 0.6);
+    if (p.life <= 0) return false;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fillStyle = p.color + Math.floor(p.life * 255).toString(16).padStart(2,'0');
+    ctx.fill();
+    return true;
+  });
+
+  thrustParticles = thrustParticles.filter(p => {
+    p.x += p.vx * dt; p.y += p.vy * dt;
+    p.vx *= 0.92; p.vy *= 0.92;
+    p.life -= dt * 2.5;
+    if (p.life <= 0) return false;
+    const alpha = p.life;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+    ctx.fillStyle = p.hue === 35
+      ? `rgba(255,${Math.floor(100+p.life*80)},0,${alpha})`
+      : `rgba(0,245,255,${alpha * 0.7})`;
+    ctx.fill();
+    return true;
+  });
+}
+
+// ─── DEATH EFFECT ────────────────────────────────────────────────
+function spawnDeathExplosion(x, y) {
+  for (let i = 0; i < 60; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = Math.random() * 300 + 50;
+    particles.push({
+      x, y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life: 1,
+      maxLife: Math.random() * 1.2 + 0.4,
+      size: Math.random() * 8 + 2,
+      color: ['#00f5ff','#ff6b35','#ffd700','#ffffff'][Math.floor(Math.random()*4)],
+    });
+  }
+}
+
+// ─── COLLISION ───────────────────────────────────────────────────
+function checkCollision(p, m) {
+  const dx = p.x - m.x, dy = p.y - m.y;
+  return Math.sqrt(dx*dx + dy*dy) < p.radius + m.size * 0.78;
+}
+
+// ─── INPUT ───────────────────────────────────────────────────────
+const keys = {};
+window.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.code === 'Space') e.preventDefault(); // prevent page scroll
+  if (e.code === 'Space' && state === 'start') startGame();
+});
+window.addEventListener('keyup', e => { keys[e.key] = false; });
+
+// Touch controls
+const touchState = { up:false, down:false, left:false, right:false };
+function bindTouch(id, dir) {
+  const el = document.getElementById(id);
+  el.addEventListener('touchstart', e => { e.preventDefault(); touchState[dir]=true; }, {passive:false});
+  el.addEventListener('touchend', e => { e.preventDefault(); touchState[dir]=false; }, {passive:false});
+  el.addEventListener('mousedown', () => touchState[dir]=true);
+  el.addEventListener('mouseup', () => touchState[dir]=false);
+}
+bindTouch('t-up','up'); bindTouch('t-down','down');
+bindTouch('t-left','left'); bindTouch('t-right','right');
+
+function getInput() {
+  return {
+    up:    keys['ArrowUp']    || keys['w'] || keys['W'] || touchState.up,
+    down:  keys['ArrowDown']  || keys['s'] || keys['S'] || touchState.down,
+    left:  keys['ArrowLeft']  || keys['a'] || keys['A'] || touchState.left,
+    right: keys['ArrowRight'] || keys['d'] || keys['D'] || touchState.right,
+    boost: keys[' '] || touchState.boost || false,
+  };
+}
+
+// ─── UPDATE PLAYER ───────────────────────────────────────────────
+function updatePlayer(p, dt) {
+  const inp = getInput();
+  p.thrustOn = false;
+  p.boosting = false;
+
+  // Build input direction vector
+  let ix = 0, iy = 0;
+  if (inp.right) ix += 1;
+  if (inp.left)  ix -= 1;
+  if (inp.down)  iy += 1;
+  if (inp.up)    iy -= 1;
+
+  const moving = ix !== 0 || iy !== 0;
+
+  // Boost charge: drains while held, recharges when released
+  if (inp.boost && p.boostCharge > 0 && moving) {
+    p.boostCharge = Math.max(0, p.boostCharge - dt * 0.55);
+    p.boosting = true;
+    p.boostDraining = true;
+  } else {
+    if (!inp.boost) p.boostDraining = false;
+    p.boostCharge = Math.min(1, p.boostCharge + dt * 0.28);
+  }
+
+  const boostMult = p.boosting ? 2.8 : 1;
+
+  if (moving) {
+    p.thrustOn = true;
+    // Normalise diagonal so speed is consistent
+    const len = Math.sqrt(ix*ix + iy*iy);
+    const nx = ix / len, ny = iy / len;
+    const acc = p.speed * boostMult;
+    p.vx += nx * acc * dt;
+    p.vy += ny * acc * dt;
+
+    // Smooth angle toward movement direction
+    p.targetAngle = Math.atan2(ny, nx);
+    let diff = p.targetAngle - p.angle;
+    // Wrap to shortest arc
+    while (diff >  Math.PI) diff -= Math.PI * 2;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    // Rotation speed: fast enough to feel responsive, slow enough to look smooth
+    const rotSpeed = 9;
+    p.angle += diff * Math.min(1, rotSpeed * dt);
+  }
+
+  // Speed cap (higher when boosting)
+  const maxSpd = p.boosting ? 520 : 320;
+  const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
+  if (spd > maxSpd) { p.vx = p.vx/spd*maxSpd; p.vy = p.vy/spd*maxSpd; }
+
+  const drag = p.boosting ? 0.93 : 0.88;
+  p.vx *= drag; p.vy *= drag;
+  p.x += p.vx * dt; p.y += p.vy * dt;
+
+  // Wrap around edges
+  const pad = 20;
+  if (p.x < -pad) p.x = W + pad;
+  if (p.x > W+pad) p.x = -pad;
+  if (p.y < -pad) p.y = H + pad;
+  if (p.y > H+pad) p.y = -pad;
+}
+
+// ─── FORMAT TIME ─────────────────────────────────────────────────
+function fmtTime(sec) {
+  const m = Math.floor(sec / 60);
+  const s = Math.floor(sec % 60);
+  return `${m}:${s.toString().padStart(2,'0')}`;
+}
+
+// ─── NEBULA BACKGROUND ───────────────────────────────────────────
+let nebulaCanvas, nebulaCtx;
+function buildNebula() {
+  nebulaCanvas = document.createElement('canvas');
+  nebulaCanvas.width = W; nebulaCanvas.height = H;
+  nebulaCtx = nebulaCanvas.getContext('2d');
+  const nc = nebulaCtx;
+
+  // Deep space gradient
+  const bg = nc.createRadialGradient(W*0.3, H*0.4, 0, W*0.5, H*0.5, Math.max(W,H)*0.8);
+  bg.addColorStop(0, '#071828');
+  bg.addColorStop(0.5, '#040e1a');
+  bg.addColorStop(1, '#020810');
+  nc.fillStyle = bg;
+  nc.fillRect(0, 0, W, H);
+
+  // Nebula clouds
+  const nebulae = [
+    { x: W*0.2, y: H*0.3, r: 200, color: 'rgba(20,0,80,0.18)' },
+    { x: W*0.75, y: H*0.6, r: 250, color: 'rgba(0,40,80,0.15)' },
+    { x: W*0.5, y: H*0.8, r: 180, color: 'rgba(60,0,40,0.12)' },
+  ];
+  nebulae.forEach(n => {
+    const grd = nc.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
+    grd.addColorStop(0, n.color);
+    grd.addColorStop(1, 'transparent');
+    nc.beginPath();
+    nc.arc(n.x, n.y, n.r, 0, Math.PI*2);
+    nc.fillStyle = grd;
+    nc.fill();
+  });
+}
+
+// ─── MAIN GAME LOOP ──────────────────────────────────────────────
+function gameLoop(ts) {
+  const dt = Math.min((ts - lastTime) / 1000, 0.05);
+  lastTime = ts;
+
+  // Background
+  ctx.drawImage(nebulaCanvas, 0, 0);
+  drawStars(dt);
+
+  if (state === 'playing') {
+    elapsed += dt;
+
+    // Spawn meteors
+    meteorSpawnTimer += dt;
+    const spawnRate = Math.max(0.8, meteorSpawnInterval - elapsed * 0.02);
+    if (meteorSpawnTimer >= spawnRate) {
+      meteorSpawnTimer = 0;
+      spawnMeteor();
+      if (elapsed > 20 && Math.random() < 0.4) spawnMeteor();
+    }
+
+    // Random splits
+    splitTimer += dt;
+    const splitRate = Math.max(3, splitInterval - elapsed * 0.05);
+    if (splitTimer >= splitRate && meteors.length > 0) {
+      splitTimer = 0;
+      const idx = Math.floor(Math.random() * meteors.length);
+      const m = meteors[idx];
+      if (m.size >= 16) {
+        splitMeteor(m);
+        meteors.splice(idx, 1);
+      }
+    }
+
+    // Update meteors
+    meteors.forEach(m => {
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      m.angle += m.spin * dt;
+    });
+
+    // Remove off-screen meteors (with big margin)
+    const margin = 150;
+    meteors = meteors.filter(m =>
+      m.x > -margin && m.x < W+margin &&
+      m.y > -margin && m.y < H+margin
+    );
+
+    // Update player
+    updatePlayer(player, dt);
+
+    // Draw particles first
+    drawParticles(dt);
+
+    // Draw meteors
+    meteors.forEach(m => drawMeteor(m));
+
+    // Draw player
+    drawPlayer(player, dt);
+
+    // Collision
+    for (const m of meteors) {
+      if (checkCollision(player, m)) {
+        spawnDeathExplosion(player.x, player.y);
+        state = 'dead';
+        showGameOver();
+        break;
+      }
+    }
+
+    // HUD
+    document.getElementById('hud-time').textContent = fmtTime(elapsed);
+    document.getElementById('hud-count').textContent = meteors.length;
+    // Boost bar
+    const bar = document.getElementById('boost-bar');
+    const pct = Math.round(player.boostCharge * 52);
+    bar.style.width = pct + 'px';
+    bar.style.opacity = player.boostCharge < 0.15 ? '0.35' : '1';
+
+    const scores = getScores();
+    if (scores.length > 0) {
+      document.getElementById('hud-best').textContent = fmtTime(scores[0].time);
+    }
+
+  } else if (state === 'dead') {
+    // Keep drawing particles after death
+    meteors.forEach(m => drawMeteor(m));
+    drawParticles(dt);
+  }
+
+  animId = requestAnimationFrame(gameLoop);
+}
+
+// ─── SHOW / HIDE SCREENS ─────────────────────────────────────────
+function showStart() {
+  document.getElementById('screen-start').classList.remove('hidden');
+  document.getElementById('screen-over').classList.add('hidden');
+  document.getElementById('hud').style.display = 'none';
+
+  const scores = getScores();
+  const prev = document.getElementById('prev-record');
+  if (scores.length > 0) {
+    const best = scores[0];
+    const name = savedName ? `${savedName}, il` : 'Il';
+    prev.textContent = `${name} tuo record: ${best.name} — ${fmtTime(best.time)}`;
+  } else {
+    prev.textContent = '';
+  }
+}
+
+function showGameOver() {
+  document.getElementById('screen-over').classList.remove('hidden');
+  document.getElementById('hud').style.display = 'none';
+
+  document.getElementById('final-time').textContent = fmtTime(elapsed);
+
+  const scores = getScores();
+  const isRecord = scores.length === 0 || elapsed > scores[0].time;
+  document.getElementById('record-badge').textContent = isRecord ? '★ NUOVO RECORD PERSONALE!' : '';
+
+  const nameInput = document.getElementById('player-name');
+  nameInput.value = savedName;
+  setTimeout(() => nameInput.focus(), 100);
+
+  renderLeaderboard();
+}
+
+function renderLeaderboard() {
+  const scores = getScores();
+  const list = document.getElementById('lb-list');
+  if (scores.length === 0) {
+    list.innerHTML = '<li style="justify-content:center;color:rgba(200,232,248,0.3);font-size:12px;">Nessun record ancora</li>';
+    return;
+  }
+  list.innerHTML = scores.slice(0,10).map((s, i) =>
+    `<li>
+      <span class="rank">#${i+1}</span>
+      <span class="name">${escHtml(s.name)}</span>
+      <span class="score">${fmtTime(s.time)}</span>
+    </li>`
+  ).join('');
+}
+
+function escHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function saveScore() {
+  const name = document.getElementById('player-name').value.trim() || 'Anonimo';
+  savedName = name;
+  localStorage.setItem('vr_name', name);
+
+  const scores = getScores();
+  scores.push({ name, time: elapsed });
+  scores.sort((a, b) => b.time - a.time);
+  saveScores(scores.slice(0, 20));
+
+  renderLeaderboard();
+  const btn = document.querySelector('#screen-over .btn-sm');
+  btn.textContent = '✓ SALVATO';
+  btn.style.background = '#00c853';
+  setTimeout(() => { btn.textContent = 'SALVA'; btn.style.background = ''; }, 2000);
+}
+
+// ─── START GAME ──────────────────────────────────────────────────
+function startGame() {
+  document.getElementById('screen-start').classList.add('hidden');
+  document.getElementById('screen-over').classList.add('hidden');
+  document.getElementById('hud').style.display = 'flex';
+
+  elapsed = 0;
+  meteorSpawnTimer = 0;
+  splitTimer = 0;
+  player = makePlayer();
+  meteors = [];
+  particles = [];
+  thrustParticles = [];
+
+  // Initial meteors
+  for (let i = 0; i < 4; i++) spawnMeteor();
+
+  state = 'playing';
+}
+
+// ─── INIT ────────────────────────────────────────────────────────
+initStars();
+buildNebula();
+showStart();
+
+lastTime = performance.now();
+animId = requestAnimationFrame(gameLoop);
+
+// Handle enter key in name input
+document.getElementById('player-name').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveScore();
+});
+
+// Prevent space from triggering buttons when typing
+document.getElementById('player-name').addEventListener('keydown', e => {
+  e.stopPropagation();
+});
+</script>
+</body>
+</html>
