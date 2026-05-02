@@ -306,6 +306,103 @@
   }
 
   .logo { animation: flicker 8s infinite; }
+
+  /* ──── MODAL ──── */
+  .modal-bg {
+    position: fixed; inset: 0;
+    background: rgba(2,6,14,0.88);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 60;
+    pointer-events: all;
+  }
+  .modal-bg.hidden { display: none; }
+
+  .modal-box {
+    background: rgba(4,18,36,0.97);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 44px 52px;
+    max-width: 500px; width: 92%;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,245,255,0.08);
+  }
+
+  .modal-title {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 13px; font-weight: 700;
+    letter-spacing: 0.3em;
+    color: var(--cyan);
+    text-shadow: 0 0 10px var(--cyan);
+    margin-bottom: 28px;
+    text-align: center;
+  }
+
+  .modal-close {
+    position: absolute; top: 16px; right: 20px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px; color: rgba(200,232,248,0.35);
+    background: none; border: none; cursor: pointer;
+    line-height: 1; transition: color 0.15s;
+    pointer-events: all;
+  }
+  .modal-close:hover { color: var(--cyan); }
+
+  .instr-row {
+    display: flex; align-items: center; gap: 18px;
+    padding: 11px 0;
+    border-bottom: 1px solid rgba(0,245,255,0.07);
+    font-size: 13px;
+  }
+  .instr-row:last-child { border-bottom: none; }
+  .instr-key {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px; font-weight: 700;
+    color: var(--bg);
+    background: var(--cyan);
+    border-radius: 3px;
+    padding: 4px 10px;
+    letter-spacing: 0.1em;
+    white-space: nowrap;
+    flex-shrink: 0;
+    min-width: 110px;
+    text-align: center;
+    box-shadow: 0 0 8px rgba(0,245,255,0.4);
+  }
+  .instr-key.danger {
+    background: var(--orange);
+    box-shadow: 0 0 8px rgba(255,107,53,0.4);
+  }
+  .instr-desc { color: var(--text); opacity: 0.8; }
+
+  /* ──── SIDE BUTTONS (start screen) ──── */
+  .start-actions {
+    display: flex; gap: 14px;
+    margin-top: 36px;
+    pointer-events: all;
+  }
+  .side-btn {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.2em;
+    color: rgba(0,245,255,0.7);
+    background: rgba(0,245,255,0.05);
+    border: 1px solid rgba(0,245,255,0.2);
+    border-radius: 3px;
+    padding: 11px 22px;
+    cursor: pointer;
+    transition: all 0.15s;
+    text-transform: uppercase;
+  }
+  .side-btn:hover {
+    background: rgba(0,245,255,0.12);
+    border-color: rgba(0,245,255,0.5);
+    color: var(--cyan);
+    box-shadow: 0 0 12px rgba(0,245,255,0.2);
+  }
+
+  /* General hidden utility */
+  .hidden { display: none !important; }
 </style>
 </head>
 <body>
@@ -329,12 +426,51 @@
   <div class="logo">VOID RUNNER</div>
   <div class="sub">SOPRAVVIVI AL COSMO</div>
   <div class="divider"></div>
-  <div class="prev-record" id="prev-record"></div>
   <button class="btn" onclick="startGame()">INIZIA MISSIONE</button>
-  <div class="controls-hint">
-    ↑ ↓ ← → oppure W A S D per muoverti<br>
-    SPAZIO per accelerare (boost)<br>
-    Schiva i meteoriti · Sopravvivi più a lungo possibile
+  <div class="start-actions">
+    <button class="side-btn" onclick="openModal('instructions')">? &nbsp;ISTRUZIONI</button>
+    <button class="side-btn" onclick="openModal('leaderboard')">🏆 &nbsp;CLASSIFICA</button>
+  </div>
+</div>
+
+<!-- MODAL OVERLAY -->
+<div class="modal-bg hidden" id="modal-bg" onclick="closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+
+    <!-- Instructions panel -->
+    <div id="modal-instructions" class="hidden">
+      <div class="modal-title">CONTROLLI</div>
+      <div class="instr-row">
+        <span class="instr-key">↑ ↓ ← →<br>W A S D</span>
+        <span class="instr-desc">Muovi la navicella nello spazio</span>
+      </div>
+      <div class="instr-row">
+        <span class="instr-key">SPAZIO</span>
+        <span class="instr-desc">Boost — accelerazione rapida (la barra gialla si svuota e si ricarica)</span>
+      </div>
+      <div class="instr-row">
+        <span class="instr-key danger">CLICK<br>oppure F</span>
+        <span class="instr-desc">Spara verso il cursore del mouse — i proiettili distruggono i meteoriti</span>
+      </div>
+      <div class="instr-row">
+        <span class="instr-key" style="background:rgba(0,245,255,0.15);color:var(--cyan);border:1px solid var(--border);">BORDI</span>
+        <span class="instr-desc">Lo schermo è ciclico — uscire da un lato fa rientrare dall'altro</span>
+      </div>
+      <div class="instr-row">
+        <span class="instr-key" style="background:rgba(255,60,0,0.2);color:#ff6040;border:1px solid rgba(255,60,0,0.4);">⚠ ROSSE</span>
+        <span class="instr-desc">Le meteore rosse sono molto più veloci — massima attenzione</span>
+      </div>
+    </div>
+
+    <!-- Leaderboard panel -->
+    <div id="modal-leaderboard" class="hidden">
+      <div class="modal-title">CLASSIFICA</div>
+      <ul class="lb-list" id="lb-list-modal" style="max-height:300px;width:100%;"></ul>
+      <div id="lb-empty" style="text-align:center;color:rgba(200,232,248,0.3);font-size:13px;padding:24px 0;display:none;">
+        Nessun record ancora. Gioca la prima partita!
+      </div>
+    </div>
   </div>
 </div>
 
@@ -386,7 +522,7 @@ let state = 'start'; // start | playing | dead
 let elapsed = 0;
 let lastTime = 0;
 let animId;
-let player, meteors, particles, stars, thrustParticles;
+let player, meteors, particles, stars, thrustParticles, bullets;
 let meteorSpawnTimer = 0, meteorSpawnInterval = 2.2;
 let splitTimer = 0, splitInterval = 5;
 let savedName = localStorage.getItem('vr_name') || '';
@@ -443,8 +579,10 @@ function makePlayer() {
     boostDraining: false,
     // drift (visual idle float)
     driftAngle: 0,
-    driftEngaged: 0,   // 0..1, lerps in when idle
+    driftEngaged: 0,
     driftRadius: 7,
+    // shooting
+    shootCooldown: 0,
   };
 }
 
@@ -964,7 +1102,109 @@ function spawnDeathExplosion(x, y) {
   }
 }
 
-// ─── COLLISION ───────────────────────────────────────────────────
+let mouseX = 0, mouseY = 0;
+canvas.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+canvas.addEventListener('mousedown', e => {
+  if (e.button === 0 && state === 'playing') tryShoot();
+});
+
+// ─── BULLETS ─────────────────────────────────────────────────────
+function tryShoot() {
+  if (!player || player.shootCooldown > 0) return;
+  player.shootCooldown = 0.18;
+
+  // Always fire in the direction the ship is currently facing
+  const aimAngle = player.angle;
+  const speed = 700;
+
+  const noseX = player.x + Math.cos(aimAngle) * 16;
+  const noseY = player.y + Math.sin(aimAngle) * 16;
+
+  bullets.push({
+    x: noseX, y: noseY,
+    vx: Math.cos(aimAngle) * speed + player.vx * 0.3,
+    vy: Math.sin(aimAngle) * speed + player.vy * 0.3,
+    angle: aimAngle,
+    life: 1,
+    maxLife: 1.4,
+  });
+}
+
+function updateAndDrawBullets(dt) {
+  const toDestroy = []; // meteor indices hit
+
+  bullets = bullets.filter(b => {
+    b.x += b.vx * dt;
+    b.y += b.vy * dt;
+    b.life -= dt / b.maxLife;
+    if (b.life <= 0) return false;
+
+    // Bullet-meteor collision
+    for (let i = 0; i < meteors.length; i++) {
+      const m = meteors[i];
+      const dx = b.x - m.x, dy = b.y - m.y;
+      if (Math.sqrt(dx*dx + dy*dy) < m.size * 0.85 + 4) {
+        // Hit! small impact flash
+        spawnBulletHit(b.x, b.y, m.fast);
+        splitMeteor(m, b.x, b.y);
+        toDestroy.push(i);
+        return false; // remove bullet
+      }
+    }
+
+    // Remove off-screen
+    if (b.x < -50 || b.x > W+50 || b.y < -50 || b.y > H+50) return false;
+
+    // Draw — elongated glowing streak
+    ctx.save();
+    ctx.translate(b.x, b.y);
+    ctx.rotate(b.angle);
+    const alpha = Math.min(1, b.life * 3);
+
+    // Outer glow
+    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 7);
+    glow.addColorStop(0, `rgba(0,245,255,${alpha * 0.35})`);
+    glow.addColorStop(1, 'rgba(0,245,255,0)');
+    ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2);
+    ctx.fillStyle = glow; ctx.fill();
+
+    // Core streak
+    const grad = ctx.createLinearGradient(-12, 0, 4, 0);
+    grad.addColorStop(0, `rgba(0,245,255,0)`);
+    grad.addColorStop(0.4, `rgba(180,255,255,${alpha * 0.7})`);
+    grad.addColorStop(1, `rgba(255,255,255,${alpha})`);
+    ctx.beginPath();
+    ctx.roundRect(-12, -1.8, 16, 3.6, 2);
+    ctx.fillStyle = grad; ctx.fill();
+
+    // Bright tip
+    ctx.beginPath(); ctx.arc(3, 0, 2.2, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`; ctx.fill();
+
+    ctx.restore();
+    return true;
+  });
+
+  // Remove hit meteors (deduplicated, highest index first)
+  if (toDestroy.length > 0) {
+    const unique = [...new Set(toDestroy)].sort((a,b) => b - a);
+    unique.forEach(i => meteors.splice(i, 1));
+  }
+}
+
+function spawnBulletHit(x, y, fast) {
+  for (let i = 0; i < 10; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = Math.random() * 120 + 30;
+    particles.push({
+      x, y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life: 1, maxLife: Math.random() * 0.3 + 0.15,
+      size: Math.random() * 3 + 1,
+      color: fast ? '#ff6020' : '#00f5ff',
+    });
+  }
+}
 function checkCollision(p, m) {
   const dx = p.x - m.x, dy = p.y - m.y;
   return Math.sqrt(dx*dx + dy*dy) < p.radius + m.size * 0.78;
@@ -998,11 +1238,15 @@ function getInput() {
     left:  keys['ArrowLeft']  || keys['a'] || keys['A'] || touchState.left,
     right: keys['ArrowRight'] || keys['d'] || keys['D'] || touchState.right,
     boost: keys[' '] || touchState.boost || false,
+    fire: keys['f'] || keys['F'],
   };
 }
 
 // ─── UPDATE PLAYER ───────────────────────────────────────────────
 function updatePlayer(p, dt) {
+  // Shoot cooldown tick
+  if (p.shootCooldown > 0) p.shootCooldown -= dt;
+
   const inp = getInput();
   p.thrustOn = false;
   p.boosting = false;
@@ -1034,6 +1278,9 @@ function updatePlayer(p, dt) {
     if (!inp.boost) p.boostDraining = false;
     p.boostCharge = Math.min(1, p.boostCharge + dt * 0.28);
   }
+
+  // F key fires
+  if (inp.fire) tryShoot();
 
   const boostMult = p.boosting ? 2.8 : 1;
 
@@ -1167,6 +1414,9 @@ function gameLoop(ts) {
     // Draw meteors
     meteors.forEach(m => drawMeteor(m));
 
+    // Draw & update bullets (before player so ship draws on top)
+    updateAndDrawBullets(dt);
+
     // Draw player
     drawPlayer(player, dt);
 
@@ -1208,16 +1458,7 @@ function showStart() {
   document.getElementById('screen-start').classList.remove('hidden');
   document.getElementById('screen-over').classList.add('hidden');
   document.getElementById('hud').style.display = 'none';
-
-  const scores = getScores();
-  const prev = document.getElementById('prev-record');
-  if (scores.length > 0) {
-    const best = scores[0];
-    const name = savedName ? `${savedName}, il` : 'Il';
-    prev.textContent = `${name} tuo record: ${best.name} — ${fmtTime(best.time)}`;
-  } else {
-    prev.textContent = '';
-  }
+  closeModal();
 }
 
 function showGameOver() {
@@ -1244,6 +1485,38 @@ function renderLeaderboard() {
     list.innerHTML = '<li style="justify-content:center;color:rgba(200,232,248,0.3);font-size:12px;">Nessun record ancora</li>';
     return;
   }
+  list.innerHTML = scores.slice(0,10).map((s, i) =>
+    `<li>
+      <span class="rank">#${i+1}</span>
+      <span class="name">${escHtml(s.name)}</span>
+      <span class="score">${fmtTime(s.time)}</span>
+    </li>`
+  ).join('');
+}
+
+// ─── MODAL ───────────────────────────────────────────────────────
+function openModal(which) {
+  document.getElementById('modal-bg').classList.remove('hidden');
+  document.getElementById('modal-instructions').classList.add('hidden');
+  document.getElementById('modal-leaderboard').classList.add('hidden');
+  document.getElementById('modal-' + which).classList.remove('hidden');
+  if (which === 'leaderboard') renderLeaderboardModal();
+}
+
+function closeModal() {
+  document.getElementById('modal-bg').classList.add('hidden');
+}
+
+function renderLeaderboardModal() {
+  const scores = getScores();
+  const list = document.getElementById('lb-list-modal');
+  const empty = document.getElementById('lb-empty');
+  if (scores.length === 0) {
+    list.innerHTML = '';
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
   list.innerHTML = scores.slice(0,10).map((s, i) =>
     `<li>
       <span class="rank">#${i+1}</span>
@@ -1287,6 +1560,7 @@ function startGame() {
   meteors = [];
   particles = [];
   thrustParticles = [];
+  bullets = [];
 
   // Initial meteors
   for (let i = 0; i < 4; i++) spawnMeteor();
