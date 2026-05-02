@@ -403,6 +403,44 @@
 
   /* General hidden utility */
   .hidden { display: none !important; }
+
+  /* ──── SKIN SELECTION ──── */
+  .skin-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    margin-top: 4px;
+  }
+  .skin-card {
+    background: rgba(0,245,255,0.04);
+    border: 1px solid rgba(0,245,255,0.15);
+    border-radius: 5px;
+    padding: 14px 12px 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    pointer-events: all;
+  }
+  .skin-card:hover {
+    background: rgba(0,245,255,0.09);
+    border-color: rgba(0,245,255,0.4);
+  }
+  .skin-card.selected {
+    border-width: 2px;
+    box-shadow: 0 0 16px rgba(0,245,255,0.2);
+  }
+  .skin-card canvas { border-radius: 3px; }
+  .skin-card .skin-name {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.22em;
+  }
+  .skin-card .skin-desc {
+    font-size: 10px;
+    color: rgba(200,232,248,0.45);
+    letter-spacing: 0.1em;
+    text-align: center;
+  }
 </style>
 </head>
 <body>
@@ -412,13 +450,13 @@
 <!-- HUD -->
 <div class="hud" id="hud" style="display:none;">
   <span><small>TEMPO</small><b id="hud-time">0:00</b></span>
-  <span><small>METEORE</small><b id="hud-count">0</b></span>
+  <span><small>PUNTI</small><b id="hud-score">0</b></span>
   <span><small>BOOST</small>
     <span id="boost-bar-wrap" style="display:flex;align-items:center;height:20px;gap:3px;">
       <span id="boost-bar" style="display:block;width:52px;height:6px;border-radius:3px;background:linear-gradient(90deg,#ffe040,#ff9000);border:1px solid rgba(255,220,0,0.4);transition:width 0.05s;"></span>
     </span>
   </span>
-  <span><small>BEST</small><b id="hud-best">--:--</b></span>
+  <span><small>RECORD</small><b id="hud-best">0</b></span>
 </div>
 
 <!-- START SCREEN -->
@@ -429,6 +467,7 @@
   <button class="btn" onclick="startGame()">INIZIA MISSIONE</button>
   <div class="start-actions">
     <button class="side-btn" onclick="openModal('instructions')">? &nbsp;ISTRUZIONI</button>
+    <button class="side-btn" onclick="openModal('skins')">🚀 &nbsp;NAVE</button>
     <button class="side-btn" onclick="openModal('leaderboard')">🏆 &nbsp;CLASSIFICA</button>
   </div>
 </div>
@@ -437,6 +476,12 @@
 <div class="modal-bg hidden" id="modal-bg" onclick="closeModal()">
   <div class="modal-box" onclick="event.stopPropagation()">
     <button class="modal-close" onclick="closeModal()">✕</button>
+
+    <!-- Skins panel -->
+    <div id="modal-skins" class="hidden">
+      <div class="modal-title">SCEGLI LA TUA NAVE</div>
+      <div class="skin-grid" id="skin-grid"></div>
+    </div>
 
     <!-- Instructions panel -->
     <div id="modal-instructions" class="hidden">
@@ -481,6 +526,9 @@
   <div class="divider"></div>
   <div class="final-label">SEI SOPRAVVISSUTO PER</div>
   <div class="final-time" id="final-time">0:00</div>
+  <div style="font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:0.25em;color:var(--gold);margin-top:6px;text-shadow:0 0 10px var(--gold);">
+    PUNTEGGIO: <span id="final-score" style="font-size:20px;font-weight:900;">0</span> PT
+  </div>
   <div class="record-badge" id="record-badge"></div>
 
   <div class="name-row">
@@ -525,9 +573,173 @@ let animId;
 let player, meteors, particles, stars, thrustParticles, bullets;
 let meteorSpawnTimer = 0, meteorSpawnInterval = 2.2;
 let splitTimer = 0, splitInterval = 5;
+let score = 0;
+let spaceObjects = [];
 let savedName = localStorage.getItem('vr_name') || '';
 
-// ─── LOCALSTORAGE ────────────────────────────────────────────────
+// ─── WORLD ───────────────────────────────────────────────────────
+const WORLD_W = 8000, WORLD_H = 8000;
+let camera = { x: WORLD_W / 2, y: WORLD_H / 2 };
+
+// ─── SKIN DEFINITIONS ────────────────────────────────────────────
+const SKINS = [
+  { id:0, name:'VIPER',    desc:'Bilanciata · fuoco standard',      accent:'#00f5ff', dark:'#031b2a' },
+  { id:1, name:'SCORPION', desc:'Veloce · proiettili pesanti lenti', accent:'#ff5520', dark:'#2a0a03' },
+  { id:2, name:'PHANTOM',  desc:'Lenta · fuoco rapido perforante',   accent:'#c060ff', dark:'#1a0530' },
+  { id:3, name:'TITAN',    desc:'Lentissima · raggio divisore',      accent:'#ffd700', dark:'#2a1e00' },
+];
+let selectedSkin = parseInt(localStorage.getItem('vr_skin') || '0');
+
+// ─── SHIP STATS ──────────────────────────────────────────────────
+const SHIP_STATS = [
+  { speed: 265, maxSpeed: 340, cooldown: 0.18, bulletSpeed: 700,  bulletType: 'normal' }, // VIPER
+  { speed: 310, maxSpeed: 400, cooldown: 0.26, bulletSpeed: 560,  bulletType: 'heavy'  }, // SCORPION
+  { speed: 195, maxSpeed: 270, cooldown: 0.09, bulletSpeed: 960,  bulletType: 'rapid'  }, // PHANTOM
+  { speed: 165, maxSpeed: 220, cooldown: 0.50, bulletSpeed: 480,  bulletType: 'beam'   }, // TITAN
+];
+
+// ─── SPACE OBJECTS (planets, moons, galaxies) ────────────────────
+function initWorld() {
+  spaceObjects = [
+    // Galaxies (large, faint — drawn first)
+    { type:'galaxy', wx:1100, wy:900,  rx:360, ry:130, angle:0.5,  color:[160,190,255] },
+    { type:'galaxy', wx:5200, wy:7400, rx:280, ry:100, angle:1.4,  color:[255,190,160] },
+    { type:'galaxy', wx:6800, wy:1600, rx:220, ry:80,  angle:2.2,  color:[180,255,200] },
+    { type:'galaxy', wx:2800, wy:5500, rx:310, ry:120, angle:0.9,  color:[220,170,255] },
+    { type:'galaxy', wx:7400, wy:4400, rx:250, ry:95,  angle:1.8,  color:[255,240,180] },
+    // Planets
+    { type:'planet', wx:2100, wy:1600, r:88,  color:[180,75,35],  rings:true,  moons:[{r:14,orbit:125,angle:0.8,speed:0.22}] },
+    { type:'planet', wx:5600, wy:1100, r:65,  color:[35,85,200],  rings:false, moons:[{r:11,orbit:95,angle:2.1,speed:0.35},{r:7,orbit:125,angle:4.5,speed:0.18}] },
+    { type:'planet', wx:6900, wy:3400, r:115, color:[200,145,45], rings:true,  moons:[{r:18,orbit:155,angle:1.3,speed:0.14},{r:9,orbit:185,angle:3.0,speed:0.09}] },
+    { type:'planet', wx:1100, wy:4600, r:52,  color:[55,165,75],  rings:false, moons:[{r:10,orbit:78,angle:1.5,speed:0.40}] },
+    { type:'planet', wx:3600, wy:6100, r:98,  color:[135,55,200], rings:true,  moons:[] },
+    { type:'planet', wx:6300, wy:5900, r:72,  color:[200,95,55],  rings:false, moons:[{r:14,orbit:105,angle:0.3,speed:0.28}] },
+    { type:'planet', wx:4100, wy:2600, r:48,  color:[175,175,215],rings:false, moons:[] },
+    { type:'planet', wx:7300, wy:7100, r:82,  color:[70,200,185], rings:true,  moons:[{r:11,orbit:115,angle:2.8,speed:0.32}] },
+    { type:'planet', wx:2800, wy:3300, r:60,  color:[220,60,80],  rings:false, moons:[{r:8,orbit:85,angle:5.1,speed:0.45}] },
+    { type:'planet', wx:5000, wy:4500, r:105, color:[80,120,200], rings:true,  moons:[{r:16,orbit:140,angle:0.7,speed:0.19},{r:10,orbit:170,angle:3.5,speed:0.12}] },
+  ];
+}
+
+function drawSpaceObjects() {
+  spaceObjects.forEach(obj => {
+    ctx.save();
+    ctx.translate(obj.wx, obj.wy);
+
+    if (obj.type === 'galaxy') {
+      const [gr, gg, gb] = obj.color;
+      ctx.rotate(obj.angle);
+      ctx.scale(1, obj.ry / obj.rx);
+      // Outer halo
+      const halo = ctx.createRadialGradient(0,0,0,0,0,obj.rx);
+      halo.addColorStop(0,   `rgba(${gr},${gg},${gb},0.10)`);
+      halo.addColorStop(0.4, `rgba(${gr},${gg},${gb},0.06)`);
+      halo.addColorStop(1,   'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,obj.rx,0,Math.PI*2);
+      ctx.fillStyle=halo; ctx.fill();
+      // Core
+      const core = ctx.createRadialGradient(0,0,0,0,0,obj.rx*0.18);
+      core.addColorStop(0, `rgba(${gr},${gg},${gb},0.45)`);
+      core.addColorStop(1, `rgba(${gr},${gg},${gb},0)`);
+      ctx.beginPath(); ctx.arc(0,0,obj.rx*0.18,0,Math.PI*2);
+      ctx.fillStyle=core; ctx.fill();
+      // Arm hints
+      for (let arm = 0; arm < 3; arm++) {
+        ctx.save(); ctx.rotate(arm * Math.PI * 0.67);
+        const armG = ctx.createLinearGradient(0,0,obj.rx*0.55,0);
+        armG.addColorStop(0,   `rgba(${gr},${gg},${gb},0.18)`);
+        armG.addColorStop(1,   'rgba(0,0,0,0)');
+        ctx.beginPath(); ctx.ellipse(obj.rx*0.28,0,obj.rx*0.3,obj.rx*0.08,0,0,Math.PI*2);
+        ctx.fillStyle=armG; ctx.fill(); ctx.restore();
+      }
+
+    } else if (obj.type === 'planet') {
+      const [pr, pg, pb] = obj.color;
+      // Atmosphere glow
+      const atm = ctx.createRadialGradient(0,0,obj.r*0.65,0,0,obj.r*1.45);
+      atm.addColorStop(0, `rgba(${pr},${pg},${pb},0.12)`);
+      atm.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,obj.r*1.45,0,Math.PI*2);
+      ctx.fillStyle=atm; ctx.fill();
+
+      // Rings behind planet (drawn first, partially hidden later)
+      if (obj.rings) {
+        ctx.save(); ctx.scale(1, 0.26);
+        ctx.beginPath(); ctx.arc(0,0,obj.r*1.75,0,Math.PI*2);
+        ctx.lineWidth = obj.r * 0.28;
+        ctx.strokeStyle = `rgba(${pr+30},${pg+20},${pb+10},0.38)`;
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(0,0,obj.r*1.42,0,Math.PI*2);
+        ctx.lineWidth = obj.r * 0.12;
+        ctx.strokeStyle = `rgba(${pr+50},${pg+30},${pb+20},0.25)`;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Planet sphere
+      const sph = ctx.createRadialGradient(-obj.r*0.32,-obj.r*0.32,0,0,0,obj.r*1.05);
+      sph.addColorStop(0,   `rgb(${Math.min(255,pr+70)},${Math.min(255,pg+70)},${Math.min(255,pb+70)})`);
+      sph.addColorStop(0.45,`rgb(${pr},${pg},${pb})`);
+      sph.addColorStop(1,   `rgb(${Math.max(0,pr-65)},${Math.max(0,pg-65)},${Math.max(0,pb-65)})`);
+      ctx.beginPath(); ctx.arc(0,0,obj.r,0,Math.PI*2);
+      ctx.fillStyle=sph; ctx.fill();
+
+      // Shadow
+      const shd = ctx.createRadialGradient(obj.r*0.38,obj.r*0.38,0,0,0,obj.r);
+      shd.addColorStop(0.35,'rgba(0,0,0,0)');
+      shd.addColorStop(1,   'rgba(0,0,25,0.72)');
+      ctx.fillStyle=shd; ctx.fill();
+
+      // Specular
+      ctx.beginPath(); ctx.arc(-obj.r*0.32,-obj.r*0.32,obj.r*0.22,0,Math.PI*2);
+      ctx.fillStyle='rgba(255,255,255,0.11)'; ctx.fill();
+
+      // Surface bands (horizontal stripes)
+      ctx.save(); ctx.beginPath(); ctx.arc(0,0,obj.r,0,Math.PI*2); ctx.clip();
+      for (let band = 0; band < 3; band++) {
+        const by = (band - 1) * obj.r * 0.5;
+        ctx.fillStyle = `rgba(0,0,0,${0.07 + band*0.03})`;
+        ctx.fillRect(-obj.r, by, obj.r*2, obj.r*0.18);
+      }
+      ctx.restore();
+
+      // Rings front (on top of planet)
+      if (obj.rings) {
+        ctx.save(); ctx.scale(1, 0.26);
+        // Clip half circle behind planet
+        ctx.beginPath(); ctx.rect(-obj.r*2.5, 0, obj.r*5, obj.r*2.5);
+        ctx.clip();
+        ctx.beginPath(); ctx.arc(0,0,obj.r*1.75,0,Math.PI*2);
+        ctx.lineWidth = obj.r * 0.28;
+        ctx.strokeStyle = `rgba(${pr+30},${pg+20},${pb+10},0.5)`;
+        ctx.stroke();
+        ctx.beginPath(); ctx.arc(0,0,obj.r*1.42,0,Math.PI*2);
+        ctx.lineWidth = obj.r * 0.12;
+        ctx.strokeStyle = `rgba(${pr+50},${pg+30},${pb+20},0.32)`;
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Moons
+      obj.moons.forEach(moon => {
+        const ma = moon.angle + elapsed * moon.speed;
+        const mx = Math.cos(ma) * moon.orbit;
+        const my = Math.sin(ma) * moon.orbit * 0.38;
+        ctx.beginPath(); ctx.arc(mx, my, moon.r, 0, Math.PI*2);
+        const mg = ctx.createRadialGradient(mx-moon.r*0.3, my-moon.r*0.3, 0, mx, my, moon.r);
+        mg.addColorStop(0,'rgba(215,215,225,0.95)');
+        mg.addColorStop(1,'rgba(90,90,110,0.7)');
+        ctx.fillStyle=mg; ctx.fill();
+        // Moon shadow
+        const ms = ctx.createRadialGradient(mx+moon.r*0.3, my+moon.r*0.3, 0, mx, my, moon.r);
+        ms.addColorStop(0.3,'rgba(0,0,0,0)'); ms.addColorStop(1,'rgba(0,0,10,0.65)');
+        ctx.fillStyle=ms; ctx.fill();
+      });
+    }
+
+    ctx.restore();
+  });
+}
 function getScores() {
   try { return JSON.parse(localStorage.getItem('vr_scores') || '[]'); }
   catch { return []; }
@@ -536,52 +748,210 @@ function saveScores(arr) {
   localStorage.setItem('vr_scores', JSON.stringify(arr));
 }
 
-// ─── STARS ───────────────────────────────────────────────────────
+// ─── STARS (parallax layers) ─────────────────────────────────────
 function makeStar() {
   return {
-    x: Math.random() * W,
-    y: Math.random() * H,
-    r: Math.random() * 1.4 + 0.2,
+    bx: Math.random() * W,   // base screen x (tiles as camera moves)
+    by: Math.random() * H,
+    r: Math.random() * 1.5 + 0.2,
     brightness: Math.random(),
     twinkle: Math.random() * Math.PI * 2,
-    speed: Math.random() * 0.1 + 0.02,
+    parallax: Math.random() * 0.28 + 0.04, // 0.04=far .. 0.32=near
   };
 }
 
 function initStars() {
-  stars = Array.from({length: 200}, makeStar);
+  stars = Array.from({length: 280}, makeStar);
 }
 
 function drawStars(dt) {
   stars.forEach(s => {
-    s.twinkle += dt * 1.2;
-    const alpha = 0.3 + s.brightness * 0.5 + Math.sin(s.twinkle) * 0.2;
+    s.twinkle += dt * 1.1;
+    const alpha = 0.25 + s.brightness * 0.55 + Math.sin(s.twinkle) * 0.2;
+    // Parallax: stars scroll slower than the world; wrap at screen edges
+    const px = ((s.bx - camera.x * s.parallax) % W + W) % W;
+    const py = ((s.by - camera.y * s.parallax) % H + H) % H;
     ctx.beginPath();
-    ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
+    ctx.arc(px, py, s.r, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(200,230,255,${alpha})`;
     ctx.fill();
   });
 }
 
+// ─── SHIP BODY RENDERER (shared between game and skin previews) ───
+function drawShipBody(c, skinId, boosting, thrustOn) {
+  const sk = SKINS[skinId] || SKINS[0];
+  const accent    = boosting ? '#ffe040' : sk.accent;
+  const accentDim = boosting ? 'rgba(255,220,0,0.6)' : sk.accent + '99';
+  const darkBase  = sk.dark;
+
+  if (skinId === 0) {
+    // ── VIPER — classic interceptor ──
+    c.beginPath();
+    c.moveTo(0,-20); c.lineTo(12,14); c.lineTo(6,8);
+    c.lineTo(0,12); c.lineTo(-6,8); c.lineTo(-12,14);
+    c.closePath();
+    c.fillStyle = '#0a1e2e'; c.fill();
+    const bl = c.createLinearGradient(-14,-22,14,16);
+    bl.addColorStop(0,'rgba(0,180,210,0.45)'); bl.addColorStop(0.4,'rgba(0,120,160,0.2)'); bl.addColorStop(1,'rgba(0,0,0,0.55)');
+    c.fillStyle = bl; c.fill();
+    const sp = c.createLinearGradient(-3,-20,3,0);
+    sp.addColorStop(0,'rgba(180,240,255,0.55)'); sp.addColorStop(1,'rgba(0,0,0,0)');
+    c.beginPath(); c.moveTo(-3,-20); c.lineTo(3,-20); c.lineTo(2,2); c.lineTo(-2,2); c.closePath();
+    c.fillStyle = sp; c.fill();
+    c.beginPath(); c.moveTo(0,-20); c.lineTo(12,14); c.lineTo(6,8); c.lineTo(0,12); c.lineTo(-6,8); c.lineTo(-12,14); c.closePath();
+    c.strokeStyle = accent; c.lineWidth = 1.5; c.stroke();
+    // cockpit
+    c.save(); c.beginPath(); c.ellipse(0,-6,4,7,0,0,Math.PI*2); c.clip();
+    c.fillStyle = boosting ? 'rgba(255,200,40,0.55)' : 'rgba(0,210,240,0.45)'; c.fillRect(-5,-14,10,16);
+    const gr = c.createLinearGradient(-3,-13,1,-5); gr.addColorStop(0,'rgba(255,255,255,0.65)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+    c.fillStyle = gr; c.fillRect(-4,-13,6,8); c.restore();
+    c.beginPath(); c.ellipse(0,-6,4,7,0,0,Math.PI*2); c.strokeStyle='rgba(255,255,255,0.3)'; c.lineWidth=0.7; c.stroke();
+    // wings
+    c.beginPath(); c.moveTo(-6,4); c.lineTo(-16,14); c.lineTo(-10,6); c.closePath();
+    c.fillStyle='#031b2a'; c.fill();
+    const lw=c.createLinearGradient(-16,14,-6,4); lw.addColorStop(0,'rgba(0,0,0,0.5)'); lw.addColorStop(1,'rgba(0,180,210,0.3)');
+    c.fillStyle=lw; c.fill(); c.strokeStyle=accentDim; c.lineWidth=1; c.stroke();
+    c.beginPath(); c.moveTo(6,4); c.lineTo(16,14); c.lineTo(10,6); c.closePath();
+    c.fillStyle='#031b2a'; c.fill();
+    const rw=c.createLinearGradient(6,4,16,14); rw.addColorStop(0,'rgba(0,180,210,0.2)'); rw.addColorStop(1,'rgba(0,0,0,0.6)');
+    c.fillStyle=rw; c.fill(); c.strokeStyle=accentDim; c.lineWidth=1; c.stroke();
+    c.beginPath(); c.moveTo(-12,14); c.lineTo(0,-20); c.strokeStyle='rgba(0,245,255,0.25)'; c.lineWidth=2; c.stroke();
+    // engine
+    if (thrustOn) {
+      const fh = boosting ? 9+Math.random()*6 : 3+Math.random()*2;
+      const fg = c.createRadialGradient(0,13,0,0,13,boosting?8:5);
+      fg.addColorStop(0,boosting?'rgba(255,255,180,1)':'rgba(255,220,80,1)'); fg.addColorStop(1,'rgba(255,80,0,0)');
+      c.beginPath(); c.ellipse(0,13,boosting?7:4,fh,0,0,Math.PI*2); c.fillStyle=fg; c.fill();
+    }
+
+  } else if (skinId === 1) {
+    // ── SCORPION — wide twin-engine fighter ──
+    c.beginPath();
+    c.moveTo(0,-18); c.lineTo(8,2); c.lineTo(22,10); c.lineTo(16,14);
+    c.lineTo(9,18); c.lineTo(-9,18); c.lineTo(-16,14); c.lineTo(-22,10); c.lineTo(-8,2);
+    c.closePath();
+    c.fillStyle = darkBase; c.fill();
+    const bl = c.createLinearGradient(-22,10,22,-18);
+    bl.addColorStop(0,'rgba(255,80,20,0.0)'); bl.addColorStop(0.5,'rgba(255,60,0,0.25)'); bl.addColorStop(1,'rgba(255,130,60,0.5)');
+    c.fillStyle=bl; c.fill();
+    c.strokeStyle=accent; c.lineWidth=1.5; c.stroke();
+    // cockpit (flat, wide)
+    c.save(); c.beginPath(); c.ellipse(0,-6,5,6,0,0,Math.PI*2); c.clip();
+    c.fillStyle='rgba(255,100,30,0.5)'; c.fillRect(-6,-13,12,14);
+    const gr=c.createLinearGradient(-4,-12,2,-4); gr.addColorStop(0,'rgba(255,255,255,0.5)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+    c.fillStyle=gr; c.fillRect(-4,-12,6,7); c.restore();
+    c.beginPath(); c.ellipse(0,-6,5,6,0,0,Math.PI*2); c.strokeStyle='rgba(255,200,180,0.4)'; c.lineWidth=0.8; c.stroke();
+    // armor ridge line down center
+    c.beginPath(); c.moveTo(0,-18); c.lineTo(0,4); c.strokeStyle='rgba(255,120,60,0.35)'; c.lineWidth=1.5; c.stroke();
+    // twin engines
+    [[-7,15],[7,15]].forEach(([ex,ey]) => {
+      if (thrustOn) {
+        const fh = boosting ? 8+Math.random()*5 : 3+Math.random()*2;
+        const fg=c.createRadialGradient(ex,ey,0,ex,ey,boosting?7:4);
+        fg.addColorStop(0,'rgba(255,200,80,1)'); fg.addColorStop(1,'rgba(255,60,0,0)');
+        c.beginPath(); c.ellipse(ex,ey,boosting?5:3,fh,0,0,Math.PI*2); c.fillStyle=fg; c.fill();
+      }
+      c.beginPath(); c.ellipse(ex,ey,3,4,0,0,Math.PI*2);
+      c.fillStyle=darkBase; c.fill(); c.strokeStyle=accentDim; c.lineWidth=0.8; c.stroke();
+    });
+    c.beginPath(); c.moveTo(-22,10); c.lineTo(0,-18); c.strokeStyle=accent+'44'; c.lineWidth=1.5; c.stroke();
+
+  } else if (skinId === 2) {
+    // ── PHANTOM — slim stealth needle ──
+    c.beginPath();
+    c.moveTo(0,-26); c.lineTo(4,-4); c.lineTo(7,14); c.lineTo(0,10); c.lineTo(-7,14); c.lineTo(-4,-4);
+    c.closePath();
+    c.fillStyle=darkBase; c.fill();
+    const bl=c.createLinearGradient(-7,14,7,-26);
+    bl.addColorStop(0,'rgba(0,0,0,0.4)'); bl.addColorStop(0.6,'rgba(160,80,255,0.3)'); bl.addColorStop(1,'rgba(200,140,255,0.5)');
+    c.fillStyle=bl; c.fill();
+    c.strokeStyle=accent; c.lineWidth=1.2; c.stroke();
+    // slim cockpit
+    c.save(); c.beginPath(); c.ellipse(0,-12,2.5,7,0,0,Math.PI*2); c.clip();
+    c.fillStyle='rgba(180,80,255,0.6)'; c.fillRect(-4,-20,8,16);
+    const gr=c.createLinearGradient(-2,-19,1,-10); gr.addColorStop(0,'rgba(255,255,255,0.6)'); gr.addColorStop(1,'rgba(255,255,255,0)');
+    c.fillStyle=gr; c.fillRect(-2,-19,4,8); c.restore();
+    c.beginPath(); c.ellipse(0,-12,2.5,7,0,0,Math.PI*2); c.strokeStyle='rgba(220,180,255,0.4)'; c.lineWidth=0.6; c.stroke();
+    // swept chevron wings
+    c.beginPath(); c.moveTo(-4,0); c.lineTo(-14,12); c.lineTo(-9,14); c.lineTo(-5,6); c.closePath();
+    c.fillStyle=darkBase; c.fill();
+    const lw=c.createLinearGradient(-14,12,-4,0); lw.addColorStop(0,'rgba(0,0,0,0.5)'); lw.addColorStop(1,'rgba(160,80,255,0.35)');
+    c.fillStyle=lw; c.fill(); c.strokeStyle=accentDim; c.lineWidth=0.9; c.stroke();
+    c.beginPath(); c.moveTo(4,0); c.lineTo(14,12); c.lineTo(9,14); c.lineTo(5,6); c.closePath();
+    c.fillStyle=darkBase; c.fill();
+    const rw=c.createLinearGradient(4,0,14,12); rw.addColorStop(0,'rgba(160,80,255,0.35)'); rw.addColorStop(1,'rgba(0,0,0,0.5)');
+    c.fillStyle=rw; c.fill(); c.strokeStyle=accentDim; c.lineWidth=0.9; c.stroke();
+    // spine line
+    c.beginPath(); c.moveTo(0,-26); c.lineTo(0,10); c.strokeStyle=accent+'55'; c.lineWidth=1; c.stroke();
+    if (thrustOn) {
+      const fh=boosting?8+Math.random()*5:3+Math.random()*2;
+      const fg=c.createRadialGradient(0,11,0,0,11,boosting?6:3);
+      fg.addColorStop(0,'rgba(220,160,255,1)'); fg.addColorStop(1,'rgba(140,0,255,0)');
+      c.beginPath(); c.ellipse(0,11,boosting?5:2.5,fh,0,0,Math.PI*2); c.fillStyle=fg; c.fill();
+    }
+
+  } else if (skinId === 3) {
+    // ── TITAN — heavy armored cruiser ──
+    // Main hull
+    c.beginPath();
+    c.moveTo(0,-16); c.lineTo(10,0); c.lineTo(12,16); c.lineTo(-12,16); c.lineTo(-10,0);
+    c.closePath();
+    c.fillStyle=darkBase; c.fill();
+    const bl=c.createLinearGradient(-12,16,12,-16);
+    bl.addColorStop(0,'rgba(0,0,0,0.5)'); bl.addColorStop(0.5,'rgba(200,140,0,0.2)'); bl.addColorStop(1,'rgba(255,220,60,0.45)');
+    c.fillStyle=bl; c.fill(); c.strokeStyle=accent; c.lineWidth=1.5; c.stroke();
+    // Left armor plate
+    c.beginPath(); c.moveTo(-10,0); c.lineTo(-22,4); c.lineTo(-20,16); c.lineTo(-12,16); c.closePath();
+    c.fillStyle=darkBase; c.fill();
+    const la=c.createLinearGradient(-22,4,-10,0); la.addColorStop(0,'rgba(180,120,0,0.15)'); la.addColorStop(1,'rgba(255,200,0,0.35)');
+    c.fillStyle=la; c.fill(); c.strokeStyle=accentDim; c.lineWidth=1; c.stroke();
+    // Right armor plate
+    c.beginPath(); c.moveTo(10,0); c.lineTo(22,4); c.lineTo(20,16); c.lineTo(12,16); c.closePath();
+    c.fillStyle=darkBase; c.fill();
+    const ra=c.createLinearGradient(10,0,22,4); ra.addColorStop(0,'rgba(255,200,0,0.35)'); ra.addColorStop(1,'rgba(180,120,0,0.1)');
+    c.fillStyle=ra; c.fill(); c.strokeStyle=accentDim; c.lineWidth=1; c.stroke();
+    // Cockpit (wide, armored)
+    c.save(); c.beginPath(); c.ellipse(0,-4,6,6,0,0,Math.PI*2); c.clip();
+    c.fillStyle='rgba(255,180,0,0.45)'; c.fillRect(-7,-11,14,14);
+    const gr=c.createLinearGradient(-5,-10,2,-2); gr.addColorStop(0,'rgba(255,255,200,0.6)'); gr.addColorStop(1,'rgba(255,255,200,0)');
+    c.fillStyle=gr; c.fillRect(-5,-10,7,7); c.restore();
+    c.beginPath(); c.ellipse(0,-4,6,6,0,0,Math.PI*2); c.strokeStyle='rgba(255,240,150,0.5)'; c.lineWidth=0.8; c.stroke();
+    // Horizontal hull line details
+    c.beginPath(); c.moveTo(-10,0); c.lineTo(10,0); c.strokeStyle=accent+'55'; c.lineWidth=1; c.stroke();
+    c.beginPath(); c.moveTo(-12,8); c.lineTo(12,8); c.strokeStyle=accent+'33'; c.lineWidth=0.8; c.stroke();
+    // Engine (wide, triple)
+    if (thrustOn) {
+      [-6,0,6].forEach(ex => {
+        const fh=boosting?8+Math.random()*5:3+Math.random()*2;
+        const fg=c.createRadialGradient(ex,15,0,ex,15,boosting?6:3);
+        fg.addColorStop(0,'rgba(255,240,120,1)'); fg.addColorStop(1,'rgba(255,140,0,0)');
+        c.beginPath(); c.ellipse(ex,15,boosting?4:2.5,fh,0,0,Math.PI*2); c.fillStyle=fg; c.fill();
+      });
+    }
+    c.beginPath(); c.moveTo(-22,4); c.lineTo(0,-16); c.strokeStyle=accent+'33'; c.lineWidth=2; c.stroke();
+  }
+}
+
 // ─── PLAYER ──────────────────────────────────────────────────────
 function makePlayer() {
+  const stats = SHIP_STATS[selectedSkin] || SHIP_STATS[0];
   return {
-    x: W / 2, y: H / 2,
+    x: WORLD_W / 2, y: WORLD_H / 2,
     vx: 0, vy: 0,
     angle: -Math.PI / 2,
     targetAngle: -Math.PI / 2,
     radius: 13,
-    speed: 240,
+    speed: stats.speed,
+    maxSpeed: stats.maxSpeed,
     alive: true,
     thrustOn: false,
     boosting: false,
     boostCharge: 1,
     boostDraining: false,
-    // drift (visual idle float)
     driftAngle: 0,
     driftEngaged: 0,
     driftRadius: 7,
-    // shooting
     shootCooldown: 0,
   };
 }
@@ -625,12 +995,13 @@ function drawPlayer(p, dt) {
     ctx.stroke();
   }
 
-  // Glow aura
+  // Glow aura — color matches skin
+  const skinAccent = SKINS[selectedSkin]?.accent || '#00f5ff';
   const auraR = p.boosting ? 26 : 22;
-  const auraColor = p.boosting ? 'rgba(255,200,0,0.22)' : 'rgba(0,245,255,0.18)';
+  const auraColor = p.boosting ? 'rgba(255,200,0,0.22)' : skinAccent + '30';
   const grd = ctx.createRadialGradient(x, y, 0, x, y, auraR);
   grd.addColorStop(0, auraColor);
-  grd.addColorStop(1, 'rgba(0,245,255,0)');
+  grd.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.beginPath();
   ctx.arc(x, y, auraR, 0, Math.PI * 2);
   ctx.fillStyle = grd;
@@ -641,123 +1012,8 @@ function drawPlayer(p, dt) {
   ctx.rotate(a + Math.PI / 2);
   ctx.scale(0.83, 0.83);
 
-  const accent = p.boosting ? '#ffe040' : '#00f5ff';
-  const accentDim = p.boosting ? 'rgba(255,220,0,0.6)' : 'rgba(0,245,255,0.6)';
-
-  // ── 3D BODY ──
-  // Clip to body shape first so gradients don't bleed
-  ctx.beginPath();
-  ctx.moveTo(0, -20);
-  ctx.lineTo(12, 14);
-  ctx.lineTo(6, 8);
-  ctx.lineTo(0, 12);
-  ctx.lineTo(-6, 8);
-  ctx.lineTo(-12, 14);
-  ctx.closePath();
-
-  // Base fill: dark blue-steel
-  ctx.fillStyle = '#0a1e2e';
-  ctx.fill();
-
-  // Directional light from top-right → lit left half, shadow right half
-  const bodyLit = ctx.createLinearGradient(-14, -22, 14, 16);
-  bodyLit.addColorStop(0,   'rgba(0,180,210,0.45)');  // lit side (left)
-  bodyLit.addColorStop(0.4, 'rgba(0,120,160,0.2)');
-  bodyLit.addColorStop(1,   'rgba(0,0,0,0.55)');       // shadow side (right)
-  ctx.fillStyle = bodyLit;
-  ctx.fill();
-
-  // Specular highlight strip down the nose
-  const spec = ctx.createLinearGradient(-3, -20, 3, 0);
-  spec.addColorStop(0,   'rgba(180,240,255,0.55)');
-  spec.addColorStop(0.5, 'rgba(100,200,240,0.15)');
-  spec.addColorStop(1,   'rgba(0,0,0,0)');
-  ctx.beginPath();
-  ctx.moveTo(-3, -20); ctx.lineTo(3, -20);
-  ctx.lineTo(2, 2); ctx.lineTo(-2, 2);
-  ctx.closePath();
-  ctx.fillStyle = spec;
-  ctx.fill();
-
-  // Outline
-  ctx.beginPath();
-  ctx.moveTo(0, -20);
-  ctx.lineTo(12, 14); ctx.lineTo(6, 8); ctx.lineTo(0, 12);
-  ctx.lineTo(-6, 8); ctx.lineTo(-12, 14);
-  ctx.closePath();
-  ctx.strokeStyle = accent;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // ── COCKPIT (glass 3D) ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(0, -6, 4, 7, 0, 0, Math.PI * 2);
-  ctx.clip();
-  // base glass tint
-  ctx.fillStyle = p.boosting ? 'rgba(255,200,40,0.55)' : 'rgba(0,210,240,0.45)';
-  ctx.fillRect(-5, -14, 10, 16);
-  // glass reflection (top-left bright streak)
-  const glassRef = ctx.createLinearGradient(-3, -13, 1, -5);
-  glassRef.addColorStop(0, 'rgba(255,255,255,0.65)');
-  glassRef.addColorStop(1, 'rgba(255,255,255,0)');
-  ctx.fillStyle = glassRef;
-  ctx.fillRect(-4, -13, 6, 8);
-  ctx.restore();
-  ctx.beginPath();
-  ctx.ellipse(0, -6, 4, 7, 0, 0, Math.PI * 2);
-  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-  ctx.lineWidth = 0.7;
-  ctx.stroke();
-
-  // ── LEFT WING (3D shading) ──
-  ctx.beginPath();
-  ctx.moveTo(-6, 4); ctx.lineTo(-16, 14); ctx.lineTo(-10, 6);
-  ctx.closePath();
-  ctx.fillStyle = '#031b2a';
-  ctx.fill();
-  const lwg = ctx.createLinearGradient(-16, 14, -6, 4);
-  lwg.addColorStop(0, 'rgba(0,0,0,0.5)');
-  lwg.addColorStop(1, 'rgba(0,180,210,0.3)');
-  ctx.fillStyle = lwg;
-  ctx.fill();
-  ctx.strokeStyle = accentDim;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // ── RIGHT WING (3D shading) ──
-  ctx.beginPath();
-  ctx.moveTo(6, 4); ctx.lineTo(16, 14); ctx.lineTo(10, 6);
-  ctx.closePath();
-  ctx.fillStyle = '#031b2a';
-  ctx.fill();
-  const rwg = ctx.createLinearGradient(6, 4, 16, 14);
-  rwg.addColorStop(0, 'rgba(0,180,210,0.2)');
-  rwg.addColorStop(1, 'rgba(0,0,0,0.6)');
-  ctx.fillStyle = rwg;
-  ctx.fill();
-  ctx.strokeStyle = accentDim;
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // ── RIM LIGHT (thin bright edge on lit side) ──
-  ctx.beginPath();
-  ctx.moveTo(-12, 14); ctx.lineTo(0, -20);
-  ctx.strokeStyle = 'rgba(0,245,255,0.25)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  // ── ENGINE FLAME ──
-  if (p.thrustOn) {
-    const flameH = p.boosting ? 9 + Math.random() * 6 : 3 + Math.random() * 2;
-    ctx.beginPath();
-    ctx.ellipse(0, 13, p.boosting ? 7 : 4, flameH, 0, 0, Math.PI * 2);
-    const flameGrd = ctx.createRadialGradient(0, 13, 0, 0, 13, p.boosting ? 8 : 5);
-    flameGrd.addColorStop(0, p.boosting ? 'rgba(255,255,180,1)' : 'rgba(255,220,80,1)');
-    flameGrd.addColorStop(1, p.boosting ? 'rgba(255,100,0,0)' : 'rgba(255,80,0,0)');
-    ctx.fillStyle = flameGrd;
-    ctx.fill();
-  }
+  // Draw the selected ship skin
+  drawShipBody(ctx, selectedSkin, p.boosting, p.thrustOn);
 
   ctx.restore();
 }
@@ -794,15 +1050,16 @@ function makeMeteor(size, x, y, vx, vy, fast) {
 }
 
 function spawnMeteor(forceFast) {
-  const side = Math.floor(Math.random() * 4);
   const fast = forceFast || (Math.random() < 0.20);
-  let x, y, vx, vy;
   const s = fast ? (Math.random() * 16 + 12) : (Math.random() * 28 + 22);
   const speed = (Math.random() * 60 + 40) * (fast ? 2.5 : 1);
-  if (side === 0) { x = -s; y = Math.random() * H; vx = speed; vy = (Math.random()-0.5)*speed; }
-  else if (side === 1) { x = W+s; y = Math.random() * H; vx = -speed; vy = (Math.random()-0.5)*speed; }
-  else if (side === 2) { x = Math.random()*W; y = -s; vx = (Math.random()-0.5)*speed; vy = speed; }
-  else { x = Math.random()*W; y = H+s; vx = (Math.random()-0.5)*speed; vy = -speed; }
+  // Spawn just outside viewport edges (world coords)
+  const side = Math.floor(Math.random() * 4);
+  let x, y, vx, vy;
+  if (side === 0) { x = camera.x - W/2 - s; y = camera.y + (Math.random()-0.5)*H; vx = speed; vy = (Math.random()-0.5)*speed; }
+  else if (side===1){ x = camera.x + W/2 + s; y = camera.y + (Math.random()-0.5)*H; vx = -speed; vy = (Math.random()-0.5)*speed; }
+  else if (side===2){ x = camera.x + (Math.random()-0.5)*W; y = camera.y - H/2 - s; vx = (Math.random()-0.5)*speed; vy = speed; }
+  else              { x = camera.x + (Math.random()-0.5)*W; y = camera.y + H/2 + s; vx = (Math.random()-0.5)*speed; vy = -speed; }
   meteors.push(makeMeteor(s, x, y, vx, vy, fast));
 }
 
@@ -1111,12 +1368,11 @@ canvas.addEventListener('mousedown', e => {
 // ─── BULLETS ─────────────────────────────────────────────────────
 function tryShoot() {
   if (!player || player.shootCooldown > 0) return;
-  player.shootCooldown = 0.18;
+  const stats = SHIP_STATS[selectedSkin] || SHIP_STATS[0];
+  player.shootCooldown = stats.cooldown;
 
-  // Always fire in the direction the ship is currently facing
   const aimAngle = player.angle;
-  const speed = 700;
-
+  const speed = stats.bulletSpeed;
   const noseX = player.x + Math.cos(aimAngle) * 16;
   const noseY = player.y + Math.sin(aimAngle) * 16;
 
@@ -1126,12 +1382,35 @@ function tryShoot() {
     vy: Math.sin(aimAngle) * speed + player.vy * 0.3,
     angle: aimAngle,
     life: 1,
-    maxLife: 1.4,
+    maxLife: stats.bulletType === 'rapid' ? 0.9 : 1.4,
+    type: stats.bulletType,
+    pierces: stats.bulletType === 'rapid' ? 2 : 0, // rapid pierces up to 2 meteors
   });
 }
 
+// ─── BEAM SPLIT (TITAN — no explosion, gentle separation) ────────
+function beamSplit(m, bx, by) {
+  const childSize = m.size * 0.52;
+  if (childSize < 8) return;
+  const perpA = Math.atan2(by - m.y, bx - m.x) + Math.PI / 2;
+  [1, -1].forEach(dir => {
+    const sp = 35 + Math.random() * 35;
+    meteors.push(makeMeteor(childSize, m.x, m.y,
+      m.vx + Math.cos(perpA) * sp * dir,
+      m.vy + Math.sin(perpA) * sp * dir,
+      m.fast
+    ));
+  });
+  // Gold ring flash only (no explosion)
+  particles.push({ x: bx, y: by, vx:0, vy:0, life:1, maxLife:0.22, size: m.size * 1.1, color:'#ffd700', isRing:true });
+  for (let i = 0; i < 6; i++) {
+    const a = Math.random() * Math.PI * 2;
+    particles.push({ x:bx, y:by, vx:Math.cos(a)*50, vy:Math.sin(a)*50, life:1, maxLife:0.2, size:2, color:'#ffd700' });
+  }
+}
+
 function updateAndDrawBullets(dt) {
-  const toDestroy = []; // meteor indices hit
+  const toDestroy = new Set();
 
   bullets = bullets.filter(b => {
     b.x += b.vx * dt;
@@ -1141,54 +1420,96 @@ function updateAndDrawBullets(dt) {
 
     // Bullet-meteor collision
     for (let i = 0; i < meteors.length; i++) {
+      if (toDestroy.has(i)) continue;
       const m = meteors[i];
       const dx = b.x - m.x, dy = b.y - m.y;
       if (Math.sqrt(dx*dx + dy*dy) < m.size * 0.85 + 4) {
-        // Hit! small impact flash
-        spawnBulletHit(b.x, b.y, m.fast);
-        splitMeteor(m, b.x, b.y);
-        toDestroy.push(i);
-        return false; // remove bullet
+        if (b.type === 'beam') {
+          beamSplit(m, b.x, b.y);
+          toDestroy.add(i);
+          score += m.fast ? 5 : 3;
+          b.pierces = (b.pierces || 0) - 1;
+          if (b.pierces < 0) return false;
+        } else if (b.type === 'rapid') {
+          spawnBulletHit(b.x, b.y, m.fast);
+          splitMeteor(m, b.x, b.y);
+          toDestroy.add(i);
+          score += m.fast ? 5 : 3;
+          b.pierces--;
+          if (b.pierces < 0) return false;
+        } else {
+          spawnBulletHit(b.x, b.y, m.fast);
+          splitMeteor(m, b.x, b.y);
+          toDestroy.add(i);
+          score += m.fast ? 5 : 3;
+          return false;
+        }
       }
     }
 
-    // Remove off-screen
-    if (b.x < -50 || b.x > W+50 || b.y < -50 || b.y > H+50) return false;
+    // Remove bullets far outside viewport (world coords)
+    const margin = 200;
+    if (b.x < camera.x - W/2 - margin || b.x > camera.x + W/2 + margin ||
+        b.y < camera.y - H/2 - margin || b.y > camera.y + H/2 + margin) return false;
 
-    // Draw — elongated glowing streak
+    // ── Draw bullet (already under world transform) ──
+    const alpha = Math.min(1, b.life * 3);
     ctx.save();
     ctx.translate(b.x, b.y);
     ctx.rotate(b.angle);
-    const alpha = Math.min(1, b.life * 3);
 
-    // Outer glow
-    const glow = ctx.createRadialGradient(0, 0, 0, 0, 0, 7);
-    glow.addColorStop(0, `rgba(0,245,255,${alpha * 0.35})`);
-    glow.addColorStop(1, 'rgba(0,245,255,0)');
-    ctx.beginPath(); ctx.arc(0, 0, 7, 0, Math.PI * 2);
-    ctx.fillStyle = glow; ctx.fill();
+    if (b.type === 'normal') {
+      // Cyan standard streak
+      const glow = ctx.createRadialGradient(0,0,0,0,0,7);
+      glow.addColorStop(0, `rgba(0,245,255,${alpha*0.35})`);
+      glow.addColorStop(1, 'rgba(0,245,255,0)');
+      ctx.beginPath(); ctx.arc(0,0,7,0,Math.PI*2); ctx.fillStyle=glow; ctx.fill();
+      const g = ctx.createLinearGradient(-12,0,4,0);
+      g.addColorStop(0,`rgba(0,245,255,0)`); g.addColorStop(0.4,`rgba(180,255,255,${alpha*0.7})`); g.addColorStop(1,`rgba(255,255,255,${alpha})`);
+      ctx.beginPath(); ctx.roundRect(-12,-1.8,16,3.6,2); ctx.fillStyle=g; ctx.fill();
+      ctx.beginPath(); ctx.arc(3,0,2.2,0,Math.PI*2); ctx.fillStyle=`rgba(255,255,255,${alpha})`; ctx.fill();
 
-    // Core streak
-    const grad = ctx.createLinearGradient(-12, 0, 4, 0);
-    grad.addColorStop(0, `rgba(0,245,255,0)`);
-    grad.addColorStop(0.4, `rgba(180,255,255,${alpha * 0.7})`);
-    grad.addColorStop(1, `rgba(255,255,255,${alpha})`);
-    ctx.beginPath();
-    ctx.roundRect(-12, -1.8, 16, 3.6, 2);
-    ctx.fillStyle = grad; ctx.fill();
+    } else if (b.type === 'heavy') {
+      // Orange-red wide bolt (SCORPION)
+      const glow = ctx.createRadialGradient(0,0,0,0,0,11);
+      glow.addColorStop(0, `rgba(255,100,20,${alpha*0.4})`);
+      glow.addColorStop(1, 'rgba(255,60,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2); ctx.fillStyle=glow; ctx.fill();
+      const g = ctx.createLinearGradient(-14,0,6,0);
+      g.addColorStop(0,'rgba(255,80,0,0)'); g.addColorStop(0.4,`rgba(255,140,40,${alpha*0.8})`); g.addColorStop(1,`rgba(255,220,120,${alpha})`);
+      ctx.beginPath(); ctx.roundRect(-14,-2.8,20,5.6,3); ctx.fillStyle=g; ctx.fill();
+      ctx.beginPath(); ctx.arc(5,0,3,0,Math.PI*2); ctx.fillStyle=`rgba(255,240,180,${alpha})`; ctx.fill();
 
-    // Bright tip
-    ctx.beginPath(); ctx.arc(3, 0, 2.2, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`; ctx.fill();
+    } else if (b.type === 'rapid') {
+      // Purple thin needle (PHANTOM)
+      const glow = ctx.createRadialGradient(0,0,0,0,0,5);
+      glow.addColorStop(0, `rgba(200,100,255,${alpha*0.5})`);
+      glow.addColorStop(1, 'rgba(150,0,255,0)');
+      ctx.beginPath(); ctx.arc(0,0,5,0,Math.PI*2); ctx.fillStyle=glow; ctx.fill();
+      const g = ctx.createLinearGradient(-16,0,4,0);
+      g.addColorStop(0,'rgba(180,0,255,0)'); g.addColorStop(0.5,`rgba(220,140,255,${alpha*0.8})`); g.addColorStop(1,`rgba(255,255,255,${alpha})`);
+      ctx.beginPath(); ctx.roundRect(-16,-1.2,20,2.4,1); ctx.fillStyle=g; ctx.fill();
+      ctx.beginPath(); ctx.arc(3,0,1.5,0,Math.PI*2); ctx.fillStyle=`rgba(255,220,255,${alpha})`; ctx.fill();
+
+    } else if (b.type === 'beam') {
+      // Gold wide beam (TITAN)
+      const glow = ctx.createRadialGradient(0,0,0,0,0,14);
+      glow.addColorStop(0, `rgba(255,220,0,${alpha*0.3})`);
+      glow.addColorStop(1, 'rgba(255,160,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,14,0,Math.PI*2); ctx.fillStyle=glow; ctx.fill();
+      const g = ctx.createLinearGradient(-18,0,6,0);
+      g.addColorStop(0,'rgba(255,180,0,0)'); g.addColorStop(0.3,`rgba(255,230,80,${alpha*0.7})`); g.addColorStop(1,`rgba(255,255,200,${alpha})`);
+      ctx.beginPath(); ctx.roundRect(-18,-4,24,8,4); ctx.fillStyle=g; ctx.fill();
+      ctx.beginPath(); ctx.arc(5,0,4,0,Math.PI*2); ctx.fillStyle=`rgba(255,255,180,${alpha})`; ctx.fill();
+    }
 
     ctx.restore();
     return true;
   });
 
-  // Remove hit meteors (deduplicated, highest index first)
-  if (toDestroy.length > 0) {
-    const unique = [...new Set(toDestroy)].sort((a,b) => b - a);
-    unique.forEach(i => meteors.splice(i, 1));
+  if (toDestroy.size > 0) {
+    const sorted = [...toDestroy].sort((a,b) => b - a);
+    sorted.forEach(i => meteors.splice(i, 1));
   }
 }
 
@@ -1299,7 +1620,7 @@ function updatePlayer(p, dt) {
     p.angle += diff * Math.min(1, 9 * dt);
   }
 
-  const maxSpd = p.boosting ? 520 : 320;
+  const maxSpd = p.boosting ? p.maxSpeed * 1.6 : p.maxSpeed;
   const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
   if (spd > maxSpd) { p.vx = p.vx/spd*maxSpd; p.vy = p.vy/spd*maxSpd; }
 
@@ -1307,11 +1628,12 @@ function updatePlayer(p, dt) {
   p.vx *= drag; p.vy *= drag;
   p.x += p.vx * dt; p.y += p.vy * dt;
 
-  const pad = 20;
-  if (p.x < -pad) p.x = W + pad;
-  if (p.x > W+pad) p.x = -pad;
-  if (p.y < -pad) p.y = H + pad;
-  if (p.y > H+pad) p.y = -pad;
+  // Clamp to world boundaries (soft bounce at edges)
+  const pad = 80;
+  if (p.x < pad)         { p.x = pad;         p.vx = Math.abs(p.vx) * 0.4; }
+  if (p.x > WORLD_W-pad) { p.x = WORLD_W-pad; p.vx = -Math.abs(p.vx) * 0.4; }
+  if (p.y < pad)         { p.y = pad;         p.vy = Math.abs(p.vy) * 0.4; }
+  if (p.y > WORLD_H-pad) { p.y = WORLD_H-pad; p.vy = -Math.abs(p.vy) * 0.4; }
 }
 
 // ─── FORMAT TIME ─────────────────────────────────────────────────
@@ -1321,50 +1643,64 @@ function fmtTime(sec) {
   return `${m}:${s.toString().padStart(2,'0')}`;
 }
 
-// ─── NEBULA BACKGROUND ───────────────────────────────────────────
-let nebulaCanvas, nebulaCtx;
-function buildNebula() {
-  nebulaCanvas = document.createElement('canvas');
-  nebulaCanvas.width = W; nebulaCanvas.height = H;
-  nebulaCtx = nebulaCanvas.getContext('2d');
-  const nc = nebulaCtx;
+// ─── DYNAMIC BACKGROUND ──────────────────────────────────────────
+function drawBackground() {
+  // Base fill
+  ctx.fillStyle = '#020810';
+  ctx.fillRect(0, 0, W, H);
 
-  // Deep space gradient
-  const bg = nc.createRadialGradient(W*0.3, H*0.4, 0, W*0.5, H*0.5, Math.max(W,H)*0.8);
-  bg.addColorStop(0, '#071828');
-  bg.addColorStop(0.5, '#040e1a');
-  bg.addColorStop(1, '#020810');
-  nc.fillStyle = bg;
-  nc.fillRect(0, 0, W, H);
+  // Normalized world position 0..1
+  const nx = camera.x / WORLD_W;
+  const ny = camera.y / WORLD_H;
 
-  // Nebula clouds
-  const nebulae = [
-    { x: W*0.2, y: H*0.3, r: 200, color: 'rgba(20,0,80,0.18)' },
-    { x: W*0.75, y: H*0.6, r: 250, color: 'rgba(0,40,80,0.15)' },
-    { x: W*0.5, y: H*0.8, r: 180, color: 'rgba(60,0,40,0.12)' },
+  // Smooth color blending across 4 space zones
+  // Zone colors: NW=purple, NE=blue, SW=red, SE=green
+  const r = Math.round(20 + Math.sin(nx * Math.PI * 2.1) * 12 + Math.sin(ny * Math.PI * 1.3 + 1) * 18);
+  const g = Math.round(3  + Math.cos(ny * Math.PI * 2.3) * 8  + Math.sin(nx * Math.PI * 1.7 + 2) * 5);
+  const b = Math.round(70 + Math.sin((nx + ny) * Math.PI * 1.8) * 35 + Math.cos(nx * Math.PI * 2.5) * 20);
+
+  // 3 large nebula clouds whose apparent position shifts slowly
+  const clouds = [
+    { ox: W * (0.25 + Math.sin(nx * 6.1) * 0.22), oy: H * (0.35 + Math.cos(ny * 5.3) * 0.25), r: Math.max(W,H) * 0.42 },
+    { ox: W * (0.72 + Math.cos(nx * 4.7 + 1) * 0.20), oy: H * (0.60 + Math.sin(ny * 3.9 + 2) * 0.28), r: Math.max(W,H) * 0.38 },
+    { ox: W * (0.50 + Math.sin(nx * 3.3 + 3) * 0.30), oy: H * (0.15 + Math.cos(ny * 4.1) * 0.18), r: Math.max(W,H) * 0.30 },
   ];
-  nebulae.forEach(n => {
-    const grd = nc.createRadialGradient(n.x, n.y, 0, n.x, n.y, n.r);
-    grd.addColorStop(0, n.color);
-    grd.addColorStop(1, 'transparent');
-    nc.beginPath();
-    nc.arc(n.x, n.y, n.r, 0, Math.PI*2);
-    nc.fillStyle = grd;
-    nc.fill();
+  clouds.forEach((c, i) => {
+    const alpha = 0.13 + i * 0.02;
+    const grd = ctx.createRadialGradient(c.ox, c.oy, 0, c.ox, c.oy, c.r);
+    grd.addColorStop(0, `rgba(${r},${g},${b},${alpha})`);
+    grd.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.beginPath(); ctx.arc(c.ox, c.oy, c.r, 0, Math.PI * 2);
+    ctx.fillStyle = grd; ctx.fill();
   });
 }
+
+// Keep a no-op buildNebula so init code doesn't break
+function buildNebula() {}
 
 // ─── MAIN GAME LOOP ──────────────────────────────────────────────
 function gameLoop(ts) {
   const dt = Math.min((ts - lastTime) / 1000, 0.05);
   lastTime = ts;
 
-  // Background
-  ctx.drawImage(nebulaCanvas, 0, 0);
+  // Dead-zone camera: ship moves freely within 30% of screen before camera scrolls
+  if (player && state === 'playing') {
+    const offX = player.x - camera.x;
+    const offY = player.y - camera.y;
+    const dzX = W * 0.30, dzY = H * 0.30;
+    if (offX >  dzX) camera.x += (offX - dzX)  * Math.min(1, 7 * dt);
+    if (offX < -dzX) camera.x += (offX + dzX)  * Math.min(1, 7 * dt);
+    if (offY >  dzY) camera.y += (offY - dzY)  * Math.min(1, 7 * dt);
+    if (offY < -dzY) camera.y += (offY + dzY)  * Math.min(1, 7 * dt);
+  }
+
+  // Dynamic background (changes color as you explore)
+  drawBackground();
   drawStars(dt);
 
   if (state === 'playing') {
     elapsed += dt;
+    score += dt; // 1 point per second survived
 
     // Spawn meteors
     meteorSpawnTimer += dt;
@@ -1382,13 +1718,10 @@ function gameLoop(ts) {
       splitTimer = 0;
       const idx = Math.floor(Math.random() * meteors.length);
       const m = meteors[idx];
-      if (m.size >= 16) {
-        splitMeteor(m);
-        meteors.splice(idx, 1);
-      }
+      if (m.size >= 16) { splitMeteor(m); meteors.splice(idx, 1); }
     }
 
-    // Update meteors
+    // Update meteors (world positions)
     meteors.forEach(m => {
       m.x += m.vx * dt;
       m.y += m.vy * dt;
@@ -1398,29 +1731,29 @@ function gameLoop(ts) {
     // Meteor–meteor collisions
     checkMeteorCollisions();
 
-    // Remove off-screen meteors (with big margin)
-    const margin = 150;
+    // Remove meteors far outside viewport (world coords)
+    const margin = 350;
     meteors = meteors.filter(m =>
-      m.x > -margin && m.x < W+margin &&
-      m.y > -margin && m.y < H+margin
+      m.x > camera.x - W/2 - margin && m.x < camera.x + W/2 + margin &&
+      m.y > camera.y - H/2 - margin && m.y < camera.y + H/2 + margin
     );
 
     // Update player
     updatePlayer(player, dt);
 
-    // Draw particles first
+    // ── Apply world→screen camera transform for all game objects ──
+    ctx.save();
+    ctx.translate(W/2 - camera.x, H/2 - camera.y);
+
+    drawSpaceObjects();   // planets, galaxies, moons
     drawParticles(dt);
-
-    // Draw meteors
     meteors.forEach(m => drawMeteor(m));
-
-    // Draw & update bullets (before player so ship draws on top)
     updateAndDrawBullets(dt);
-
-    // Draw player
     drawPlayer(player, dt);
 
-    // Collision
+    ctx.restore();
+
+    // Collision (world coords, no transform needed)
     for (const m of meteors) {
       if (checkCollision(player, m)) {
         spawnDeathExplosion(player.x, player.y);
@@ -1432,22 +1765,20 @@ function gameLoop(ts) {
 
     // HUD
     document.getElementById('hud-time').textContent = fmtTime(elapsed);
-    document.getElementById('hud-count').textContent = meteors.length;
-    // Boost bar
+    document.getElementById('hud-score').textContent = Math.floor(score);
     const bar = document.getElementById('boost-bar');
     const pct = Math.round(player.boostCharge * 52);
     bar.style.width = pct + 'px';
     bar.style.opacity = player.boostCharge < 0.15 ? '0.35' : '1';
-
-    const scores = getScores();
-    if (scores.length > 0) {
-      document.getElementById('hud-best').textContent = fmtTime(scores[0].time);
-    }
+    const bestScore = parseInt(localStorage.getItem('vr_best_score') || '0');
+    document.getElementById('hud-best').textContent = bestScore;
 
   } else if (state === 'dead') {
-    // Keep drawing particles after death
+    ctx.save();
+    ctx.translate(W/2 - camera.x, H/2 - camera.y);
     meteors.forEach(m => drawMeteor(m));
     drawParticles(dt);
+    ctx.restore();
   }
 
   animId = requestAnimationFrame(gameLoop);
@@ -1466,9 +1797,10 @@ function showGameOver() {
   document.getElementById('hud').style.display = 'none';
 
   document.getElementById('final-time').textContent = fmtTime(elapsed);
+  document.getElementById('final-score').textContent = Math.floor(score);
 
-  const scores = getScores();
-  const isRecord = scores.length === 0 || elapsed > scores[0].time;
+  const bestScore = parseInt(localStorage.getItem('vr_best_score') || '0');
+  const isRecord = Math.floor(score) > bestScore;
   document.getElementById('record-badge').textContent = isRecord ? '★ NUOVO RECORD PERSONALE!' : '';
 
   const nameInput = document.getElementById('player-name');
@@ -1489,7 +1821,7 @@ function renderLeaderboard() {
     `<li>
       <span class="rank">#${i+1}</span>
       <span class="name">${escHtml(s.name)}</span>
-      <span class="score">${fmtTime(s.time)}</span>
+      <span class="score">${s.score ?? '-'} pt &nbsp;<span style="opacity:0.45;font-size:11px;">${fmtTime(s.time)}</span></span>
     </li>`
   ).join('');
 }
@@ -1499,8 +1831,60 @@ function openModal(which) {
   document.getElementById('modal-bg').classList.remove('hidden');
   document.getElementById('modal-instructions').classList.add('hidden');
   document.getElementById('modal-leaderboard').classList.add('hidden');
+  document.getElementById('modal-skins').classList.add('hidden');
   document.getElementById('modal-' + which).classList.remove('hidden');
   if (which === 'leaderboard') renderLeaderboardModal();
+  if (which === 'skins') renderSkinGrid();
+}
+
+function renderSkinGrid() {
+  const grid = document.getElementById('skin-grid');
+  grid.innerHTML = '';
+  SKINS.forEach(sk => {
+    const card = document.createElement('div');
+    card.className = 'skin-card' + (sk.id === selectedSkin ? ' selected' : '');
+    card.style.borderColor = sk.id === selectedSkin ? sk.accent : '';
+    card.style.boxShadow = sk.id === selectedSkin ? `0 0 18px ${sk.accent}40` : '';
+
+    // Preview canvas
+    const cv = document.createElement('canvas');
+    cv.width = 110; cv.height = 110;
+    const pc = cv.getContext('2d');
+    pc.clearRect(0, 0, 110, 110);
+    // Background
+    const bg = pc.createRadialGradient(55, 55, 0, 55, 55, 55);
+    bg.addColorStop(0, 'rgba(10,25,45,0.9)');
+    bg.addColorStop(1, 'rgba(2,6,14,0)');
+    pc.fillStyle = bg; pc.fillRect(0, 0, 110, 110);
+    // Draw ship centered, rotated to face up
+    pc.save();
+    pc.translate(55, 60);
+    pc.rotate(Math.PI / 2);  // face right → rotate to face up
+    pc.scale(1.7, 1.7);
+    drawShipBody(pc, sk.id, false, false);
+    pc.restore();
+
+    const name = document.createElement('div');
+    name.className = 'skin-name';
+    name.style.color = sk.accent;
+    name.textContent = sk.name;
+
+    const desc = document.createElement('div');
+    desc.className = 'skin-desc';
+    desc.textContent = sk.desc;
+
+    card.appendChild(cv);
+    card.appendChild(name);
+    card.appendChild(desc);
+
+    card.addEventListener('click', () => {
+      selectedSkin = sk.id;
+      localStorage.setItem('vr_skin', sk.id);
+      renderSkinGrid(); // re-render to update selection
+    });
+
+    grid.appendChild(card);
+  });
 }
 
 function closeModal() {
@@ -1521,7 +1905,7 @@ function renderLeaderboardModal() {
     `<li>
       <span class="rank">#${i+1}</span>
       <span class="name">${escHtml(s.name)}</span>
-      <span class="score">${fmtTime(s.time)}</span>
+      <span class="score">${s.score ?? '-'} pt &nbsp;<span style="opacity:0.45;font-size:11px;">${fmtTime(s.time)}</span></span>
     </li>`
   ).join('');
 }
@@ -1535,9 +1919,13 @@ function saveScore() {
   savedName = name;
   localStorage.setItem('vr_name', name);
 
+  const finalScore = Math.floor(score);
+  const bestScore = parseInt(localStorage.getItem('vr_best_score') || '0');
+  if (finalScore > bestScore) localStorage.setItem('vr_best_score', finalScore);
+
   const scores = getScores();
-  scores.push({ name, time: elapsed });
-  scores.sort((a, b) => b.time - a.time);
+  scores.push({ name, score: finalScore, time: elapsed });
+  scores.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
   saveScores(scores.slice(0, 20));
 
   renderLeaderboard();
@@ -1554,13 +1942,17 @@ function startGame() {
   document.getElementById('hud').style.display = 'flex';
 
   elapsed = 0;
+  score = 0;
   meteorSpawnTimer = 0;
   splitTimer = 0;
   player = makePlayer();
+  camera.x = player.x;
+  camera.y = player.y;
   meteors = [];
   particles = [];
   thrustParticles = [];
   bullets = [];
+  initWorld();
 
   // Initial meteors
   for (let i = 0; i < 4; i++) spawnMeteor();
