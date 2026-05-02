@@ -439,16 +439,27 @@ function makePlayer() {
     alive: true,
     thrustOn: false,
     boosting: false,
-    boostCharge: 1,      // 0..1
+    boostCharge: 1,
     boostDraining: false,
+    // drift (visual idle float)
+    driftAngle: 0,
+    driftEngaged: 0,   // 0..1, lerps in when idle
+    driftRadius: 7,
   };
 }
 
 function drawPlayer(p, dt) {
-  const x = p.x, y = p.y, a = p.angle;
+  // ── Drift visual offset (does NOT affect collision position) ──
+  const driftX = Math.cos(p.driftAngle) * p.driftRadius * p.driftEngaged;
+  const driftY = Math.sin(p.driftAngle) * p.driftRadius * p.driftEngaged;
+  const driftAngleWobble = Math.sin(p.driftAngle * 0.7) * 0.07 * p.driftEngaged;
+
+  const x = p.x + driftX;
+  const y = p.y + driftY;
+  const a = p.angle + driftAngleWobble;
   const cos = Math.cos(a), sin = Math.sin(a);
 
-  // Thrust particles (more & brighter when boosting)
+  // Thrust particles
   if (p.thrustOn && state === 'playing') {
     const count = p.boosting ? 7 : 3;
     for (let i = 0; i < count; i++) {
@@ -490,9 +501,13 @@ function drawPlayer(p, dt) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(a + Math.PI / 2);
-  ctx.scale(0.83, 0.83);   // ← makes ship ~15% smaller
+  ctx.scale(0.83, 0.83);
 
-  // Body
+  const accent = p.boosting ? '#ffe040' : '#00f5ff';
+  const accentDim = p.boosting ? 'rgba(255,220,0,0.6)' : 'rgba(0,245,255,0.6)';
+
+  // ── 3D BODY ──
+  // Clip to body shape first so gradients don't bleed
   ctx.beginPath();
   ctx.moveTo(0, -20);
   ctx.lineTo(12, 14);
@@ -501,43 +516,108 @@ function drawPlayer(p, dt) {
   ctx.lineTo(-6, 8);
   ctx.lineTo(-12, 14);
   ctx.closePath();
-  ctx.fillStyle = '#0a2a3a';
-  ctx.strokeStyle = p.boosting ? '#ffe040' : '#00f5ff';
-  ctx.lineWidth = 1.5;
+
+  // Base fill: dark blue-steel
+  ctx.fillStyle = '#0a1e2e';
   ctx.fill();
+
+  // Directional light from top-right → lit left half, shadow right half
+  const bodyLit = ctx.createLinearGradient(-14, -22, 14, 16);
+  bodyLit.addColorStop(0,   'rgba(0,180,210,0.45)');  // lit side (left)
+  bodyLit.addColorStop(0.4, 'rgba(0,120,160,0.2)');
+  bodyLit.addColorStop(1,   'rgba(0,0,0,0.55)');       // shadow side (right)
+  ctx.fillStyle = bodyLit;
+  ctx.fill();
+
+  // Specular highlight strip down the nose
+  const spec = ctx.createLinearGradient(-3, -20, 3, 0);
+  spec.addColorStop(0,   'rgba(180,240,255,0.55)');
+  spec.addColorStop(0.5, 'rgba(100,200,240,0.15)');
+  spec.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.moveTo(-3, -20); ctx.lineTo(3, -20);
+  ctx.lineTo(2, 2); ctx.lineTo(-2, 2);
+  ctx.closePath();
+  ctx.fillStyle = spec;
+  ctx.fill();
+
+  // Outline
+  ctx.beginPath();
+  ctx.moveTo(0, -20);
+  ctx.lineTo(12, 14); ctx.lineTo(6, 8); ctx.lineTo(0, 12);
+  ctx.lineTo(-6, 8); ctx.lineTo(-12, 14);
+  ctx.closePath();
+  ctx.strokeStyle = accent;
+  ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Cockpit
+  // ── COCKPIT (glass 3D) ──
+  ctx.save();
   ctx.beginPath();
   ctx.ellipse(0, -6, 4, 7, 0, 0, Math.PI * 2);
-  ctx.fillStyle = p.boosting ? 'rgba(255,220,80,0.7)' : 'rgba(0,245,255,0.5)';
+  ctx.clip();
+  // base glass tint
+  ctx.fillStyle = p.boosting ? 'rgba(255,200,40,0.55)' : 'rgba(0,210,240,0.45)';
+  ctx.fillRect(-5, -14, 10, 16);
+  // glass reflection (top-left bright streak)
+  const glassRef = ctx.createLinearGradient(-3, -13, 1, -5);
+  glassRef.addColorStop(0, 'rgba(255,255,255,0.65)');
+  glassRef.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = glassRef;
+  ctx.fillRect(-4, -13, 6, 8);
+  ctx.restore();
+  ctx.beginPath();
+  ctx.ellipse(0, -6, 4, 7, 0, 0, Math.PI * 2);
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 0.7;
+  ctx.stroke();
+
+  // ── LEFT WING (3D shading) ──
+  ctx.beginPath();
+  ctx.moveTo(-6, 4); ctx.lineTo(-16, 14); ctx.lineTo(-10, 6);
+  ctx.closePath();
+  ctx.fillStyle = '#031b2a';
   ctx.fill();
-
-  // Left wing
-  ctx.beginPath();
-  ctx.moveTo(-6, 4);
-  ctx.lineTo(-16, 14);
-  ctx.lineTo(-10, 6);
-  ctx.closePath();
-  ctx.fillStyle = '#052535';
-  ctx.strokeStyle = p.boosting ? 'rgba(255,200,0,0.7)' : 'rgba(0,245,255,0.6)';
+  const lwg = ctx.createLinearGradient(-16, 14, -6, 4);
+  lwg.addColorStop(0, 'rgba(0,0,0,0.5)');
+  lwg.addColorStop(1, 'rgba(0,180,210,0.3)');
+  ctx.fillStyle = lwg;
+  ctx.fill();
+  ctx.strokeStyle = accentDim;
   ctx.lineWidth = 1;
-  ctx.fill(); ctx.stroke();
+  ctx.stroke();
 
-  // Right wing
+  // ── RIGHT WING (3D shading) ──
   ctx.beginPath();
-  ctx.moveTo(6, 4);
-  ctx.lineTo(16, 14);
-  ctx.lineTo(10, 6);
+  ctx.moveTo(6, 4); ctx.lineTo(16, 14); ctx.lineTo(10, 6);
   ctx.closePath();
-  ctx.fill(); ctx.stroke();
+  ctx.fillStyle = '#031b2a';
+  ctx.fill();
+  const rwg = ctx.createLinearGradient(6, 4, 16, 14);
+  rwg.addColorStop(0, 'rgba(0,180,210,0.2)');
+  rwg.addColorStop(1, 'rgba(0,0,0,0.6)');
+  ctx.fillStyle = rwg;
+  ctx.fill();
+  ctx.strokeStyle = accentDim;
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  // Engine flame
+  // ── RIM LIGHT (thin bright edge on lit side) ──
+  ctx.beginPath();
+  ctx.moveTo(-12, 14); ctx.lineTo(0, -20);
+  ctx.strokeStyle = 'rgba(0,245,255,0.25)';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // ── ENGINE FLAME ──
   if (p.thrustOn) {
-    const flameH = p.boosting ? 9 + Math.random() * 6 : 3;
+    const flameH = p.boosting ? 9 + Math.random() * 6 : 3 + Math.random() * 2;
     ctx.beginPath();
     ctx.ellipse(0, 13, p.boosting ? 7 : 4, flameH, 0, 0, Math.PI * 2);
-    ctx.fillStyle = p.boosting ? `rgba(255,220,0,0.95)` : `rgba(255,140,0,0.9)`;
+    const flameGrd = ctx.createRadialGradient(0, 13, 0, 0, 13, p.boosting ? 8 : 5);
+    flameGrd.addColorStop(0, p.boosting ? 'rgba(255,255,180,1)' : 'rgba(255,220,80,1)');
+    flameGrd.addColorStop(1, p.boosting ? 'rgba(255,100,0,0)' : 'rgba(255,80,0,0)');
+    ctx.fillStyle = flameGrd;
     ctx.fill();
   }
 
@@ -545,10 +625,11 @@ function drawPlayer(p, dt) {
 }
 
 // ─── METEORS ─────────────────────────────────────────────────────
-function makeMeteor(size, x, y, vx, vy) {
+function makeMeteor(size, x, y, vx, vy, fast) {
   const s = size || (Math.random() * 28 + 22);
   const angle = Math.random() * Math.PI * 2;
-  const speed = (Math.random() * 70 + 40) * (50 / s);
+  const baseSpeed = (Math.random() * 70 + 40) * (50 / s);
+  const speed = fast ? baseSpeed * 2.4 : baseSpeed;
   const pts = Math.floor(Math.random() * 4 + 7);
   const shape = [];
   for (let i = 0; i < pts; i++) {
@@ -556,77 +637,146 @@ function makeMeteor(size, x, y, vx, vy) {
     const r = s * (0.7 + Math.random() * 0.3);
     shape.push({a, r});
   }
+  // Fixed light angle per meteor so shading doesn't flicker
+  const lightAngle = Math.random() * Math.PI * 2;
   return {
     x: x !== undefined ? x : (Math.random() > 0.5 ? -s : W + s),
     y: y !== undefined ? y : (Math.random() * H),
     vx: vx !== undefined ? vx : (Math.cos(angle) * speed),
     vy: vy !== undefined ? vy : (Math.sin(angle) * speed),
     size: s,
-    spin: (Math.random() - 0.5) * 1.5,
+    spin: (Math.random() - 0.5) * (fast ? 3 : 1.5),
     angle: Math.random() * Math.PI * 2,
     shape,
     health: 1,
     glowPulse: Math.random() * Math.PI * 2,
+    fast: !!fast,
+    lightAngle,           // direction of the "sun" highlight
   };
 }
 
-function spawnMeteor() {
+function spawnMeteor(forceFast) {
   const side = Math.floor(Math.random() * 4);
+  const fast = forceFast || (Math.random() < 0.20);
   let x, y, vx, vy;
-  const s = Math.random() * 28 + 22;
-  const speed = Math.random() * 60 + 40;
+  const s = fast ? (Math.random() * 16 + 12) : (Math.random() * 28 + 22);
+  const speed = (Math.random() * 60 + 40) * (fast ? 2.5 : 1);
   if (side === 0) { x = -s; y = Math.random() * H; vx = speed; vy = (Math.random()-0.5)*speed; }
   else if (side === 1) { x = W+s; y = Math.random() * H; vx = -speed; vy = (Math.random()-0.5)*speed; }
   else if (side === 2) { x = Math.random()*W; y = -s; vx = (Math.random()-0.5)*speed; vy = speed; }
   else { x = Math.random()*W; y = H+s; vx = (Math.random()-0.5)*speed; vy = -speed; }
-  meteors.push(makeMeteor(s, x, y, vx, vy));
+  meteors.push(makeMeteor(s, x, y, vx, vy, fast));
 }
 
-function splitMeteor(m) {
+function splitMeteor(m, impactX, impactY) {
   const count = Math.floor(Math.random() * 2 + 2);
   const childSize = m.size * 0.48;
-  if (childSize < 8) return;
-  for (let i = 0; i < count; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = Math.random() * 80 + 50;
-    meteors.push(makeMeteor(childSize, m.x, m.y,
-      m.vx * 0.5 + Math.cos(angle) * speed,
-      m.vy * 0.5 + Math.sin(angle) * speed
-    ));
+  const cx = impactX !== undefined ? impactX : m.x;
+  const cy = impactY !== undefined ? impactY : m.y;
+
+  if (childSize >= 8) {
+    for (let i = 0; i < count; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = Math.random() * 80 + 50;
+      meteors.push(makeMeteor(childSize, m.x, m.y,
+        m.vx * 0.5 + Math.cos(angle) * speed,
+        m.vy * 0.5 + Math.sin(angle) * speed,
+        m.fast
+      ));
+    }
   }
-  // Explosion particles
-  for (let i = 0; i < 22; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const sp = Math.random() * 180 + 40;
+
+  // Impact flash ring
+  particles.push({
+    x: cx, y: cy, vx: 0, vy: 0,
+    life: 1, maxLife: 0.25,
+    size: m.size * 1.4,
+    color: m.fast ? '#ff2200' : '#ff9900',
+    isRing: true,
+  });
+
+  // Rock debris chunks (larger angular pieces)
+  const debrisCount = Math.floor(m.size / 6) + 4;
+  for (let i = 0; i < debrisCount; i++) {
+    const a = (i / debrisCount) * Math.PI * 2 + Math.random() * 0.4;
+    const sp = Math.random() * 140 + 60;
+    const sz = Math.random() * (m.size * 0.18) + 2;
     particles.push({
-      x: m.x, y: m.y,
+      x: cx + Math.cos(a) * m.size * 0.3,
+      y: cy + Math.sin(a) * m.size * 0.3,
+      vx: Math.cos(a)*sp + m.vx*0.3, vy: Math.sin(a)*sp + m.vy*0.3,
+      life: 1,
+      maxLife: Math.random() * 0.9 + 0.4,
+      size: sz,
+      color: m.fast ? '#cc3300' : '#7a5030',
+      spin: (Math.random()-0.5)*8,
+      isDebris: true,
+    });
+  }
+
+  // Dust cloud particles
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = Math.random() * 100 + 20;
+    particles.push({
+      x: cx, y: cy,
+      vx: Math.cos(a)*sp + m.vx*0.2, vy: Math.sin(a)*sp + m.vy*0.2,
+      life: 1,
+      maxLife: Math.random() * 0.6 + 0.3,
+      size: Math.random() * 4 + 1,
+      color: m.fast ? '#ff4422' : '#c87840',
+    });
+  }
+
+  // Hot core sparks
+  for (let i = 0; i < 12; i++) {
+    const a = Math.random() * Math.PI * 2;
+    const sp = Math.random() * 200 + 80;
+    particles.push({
+      x: cx, y: cy,
       vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
       life: 1,
-      maxLife: Math.random() * 0.8 + 0.3,
-      size: Math.random() * 5 + 1,
-      color: Math.random() > 0.5 ? '#ff8c00' : '#ff4444',
+      maxLife: Math.random() * 0.35 + 0.1,
+      size: Math.random() * 2.5 + 0.5,
+      color: m.fast ? '#ffaa00' : '#ffcc44',
     });
   }
 }
 
 function drawMeteor(m) {
   m.glowPulse += 0.02;
-  const glow = 0.12 + Math.sin(m.glowPulse) * 0.05;
+  const glow = 0.10 + Math.sin(m.glowPulse) * 0.04;
+
+  // Light direction (fixed per meteor, rotates with spin for 3D feel)
+  const la = m.lightAngle + m.angle * 0.4;   // slight co-rotation with spin
+  const lx = Math.cos(la), ly = Math.sin(la);
+  // Highlight offset = 35% of radius toward light
+  const hx = lx * m.size * 0.35, hy = ly * m.size * 0.35;
+  // Shadow offset = opposite
+  const sx = -lx * m.size * 0.3, sy = -ly * m.size * 0.3;
 
   ctx.save();
   ctx.translate(m.x, m.y);
   ctx.rotate(m.angle);
 
-  // Glow
-  const grd = ctx.createRadialGradient(0, 0, m.size * 0.3, 0, 0, m.size * 1.2);
-  grd.addColorStop(0, `rgba(255,140,60,${glow})`);
-  grd.addColorStop(1, 'rgba(255,80,0,0)');
+  // ── Outer glow ──
+  const glowColor = m.fast
+    ? `rgba(255,60,0,${glow * 1.8})`
+    : `rgba(255,140,60,${glow})`;
+  const glowOuter = m.fast
+    ? `rgba(200,0,0,0)`
+    : `rgba(255,80,0,0)`;
+  const glowR = m.fast ? m.size * 1.5 : m.size * 1.2;
+
+  const outerGrd = ctx.createRadialGradient(0, 0, m.size * 0.2, 0, 0, glowR);
+  outerGrd.addColorStop(0, glowColor);
+  outerGrd.addColorStop(1, glowOuter);
   ctx.beginPath();
-  ctx.arc(0, 0, m.size * 1.2, 0, Math.PI * 2);
-  ctx.fillStyle = grd;
+  ctx.arc(0, 0, glowR, 0, Math.PI * 2);
+  ctx.fillStyle = outerGrd;
   ctx.fill();
 
-  // Rock
+  // ── Rock shape path (used for fill + clip) ──
   ctx.beginPath();
   m.shape.forEach((p, i) => {
     const nx = Math.cos(p.a) * p.r;
@@ -634,28 +784,91 @@ function drawMeteor(m) {
     if (i === 0) ctx.moveTo(nx, ny); else ctx.lineTo(nx, ny);
   });
   ctx.closePath();
+  ctx.save();
+  ctx.clip();
 
-  const rockGrd = ctx.createRadialGradient(-m.size*0.3, -m.size*0.3, 0, 0, 0, m.size);
-  rockGrd.addColorStop(0, '#6a4a2a');
-  rockGrd.addColorStop(0.5, '#3d2a15');
-  rockGrd.addColorStop(1, '#1a100a');
+  // ── Base rock color (3D sphere-like gradient) ──
+  const rockGrd = ctx.createRadialGradient(hx, hy, 0, sx * 0.5, sy * 0.5, m.size * 1.1);
+  if (m.fast) {
+    rockGrd.addColorStop(0,   '#7a2010');   // lit face — deep red
+    rockGrd.addColorStop(0.4, '#4a1008');
+    rockGrd.addColorStop(1,   '#180402');   // shadow — near black
+  } else {
+    rockGrd.addColorStop(0,   '#7a5530');   // lit face — warm brown
+    rockGrd.addColorStop(0.4, '#4a3018');
+    rockGrd.addColorStop(1,   '#180e06');   // shadow — near black
+  }
   ctx.fillStyle = rockGrd;
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(180,120,60,0.6)';
-  ctx.lineWidth = 1;
-  ctx.stroke();
+  ctx.fillRect(-m.size * 1.5, -m.size * 1.5, m.size * 3, m.size * 3);
 
-  // Surface cracks
-  ctx.strokeStyle = 'rgba(100,60,20,0.5)';
-  ctx.lineWidth = 0.7;
-  for (let i = 0; i < 3; i++) {
-    const a1 = Math.random() * Math.PI * 2;
-    const len = m.size * 0.4;
+  // ── Shadow side darkening overlay ──
+  const shadowGrd = ctx.createRadialGradient(sx, sy, 0, sx, sy, m.size * 1.3);
+  shadowGrd.addColorStop(0,   'rgba(0,0,0,0.55)');
+  shadowGrd.addColorStop(0.6, 'rgba(0,0,0,0.2)');
+  shadowGrd.addColorStop(1,   'rgba(0,0,0,0)');
+  ctx.fillStyle = shadowGrd;
+  ctx.fillRect(-m.size * 1.5, -m.size * 1.5, m.size * 3, m.size * 3);
+
+  // ── Specular highlight (small bright dot on lit side) ──
+  const specR = m.size * 0.35;
+  const specGrd = ctx.createRadialGradient(hx, hy, 0, hx, hy, specR);
+  if (m.fast) {
+    specGrd.addColorStop(0,   'rgba(255,180,120,0.7)');
+    specGrd.addColorStop(0.5, 'rgba(255,80,0,0.2)');
+  } else {
+    specGrd.addColorStop(0,   'rgba(255,240,200,0.6)');
+    specGrd.addColorStop(0.5, 'rgba(200,160,80,0.15)');
+  }
+  specGrd.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = specGrd;
+  ctx.fillRect(-m.size * 1.5, -m.size * 1.5, m.size * 3, m.size * 3);
+
+  // ── Surface detail: fixed cracks (seeded by shape indices) ──
+  ctx.strokeStyle = m.fast ? 'rgba(180,40,10,0.5)' : 'rgba(80,45,15,0.55)';
+  ctx.lineWidth = 0.8;
+  for (let i = 0; i < m.shape.length - 1; i += 3) {
+    const p1 = m.shape[i], p2 = m.shape[(i+2) % m.shape.length];
+    const mid = m.size * 0.25;
     ctx.beginPath();
-    ctx.moveTo(Math.cos(a1)*len*0.2, Math.sin(a1)*len*0.2);
-    ctx.lineTo(Math.cos(a1)*len, Math.sin(a1)*len);
+    ctx.moveTo(Math.cos(p1.a)*mid, Math.sin(p1.a)*mid);
+    ctx.lineTo(Math.cos(p2.a)*p2.r*0.55, Math.sin(p2.a)*p2.r*0.55);
     ctx.stroke();
   }
+
+  ctx.restore(); // end clip
+
+  // ── Outline ──
+  ctx.beginPath();
+  m.shape.forEach((p, i) => {
+    const nx = Math.cos(p.a) * p.r;
+    const ny = Math.sin(p.a) * p.r;
+    if (i === 0) ctx.moveTo(nx, ny); else ctx.lineTo(nx, ny);
+  });
+  ctx.closePath();
+  if (m.fast) {
+    ctx.strokeStyle = 'rgba(255,80,30,0.8)';
+    ctx.lineWidth = 1.2;
+  } else {
+    ctx.strokeStyle = 'rgba(180,120,60,0.55)';
+    ctx.lineWidth = 1;
+  }
+  ctx.stroke();
+
+  // Rim light on lit edge (thin bright line)
+  ctx.beginPath();
+  m.shape.forEach((pt, i) => {
+    const dot = Math.cos(pt.a) * lx + Math.sin(pt.a) * ly;
+    if (dot > 0.4) {
+      const nx = Math.cos(pt.a) * pt.r;
+      const ny = Math.sin(pt.a) * pt.r;
+      if (i === 0) ctx.moveTo(nx, ny); else ctx.lineTo(nx, ny);
+    }
+  });
+  ctx.strokeStyle = m.fast
+    ? 'rgba(255,150,80,0.45)'
+    : 'rgba(220,180,100,0.35)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
 
   ctx.restore();
 }
@@ -667,10 +880,28 @@ function drawParticles(dt) {
     p.vx *= 0.96; p.vy *= 0.96;
     p.life -= dt / (p.maxLife || 0.6);
     if (p.life <= 0) return false;
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
-    ctx.fillStyle = p.color + Math.floor(p.life * 255).toString(16).padStart(2,'0');
-    ctx.fill();
+
+    if (p.isRing) {
+      // Expanding impact ring
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * (1 - p.life * 0.3), 0, Math.PI * 2);
+      ctx.strokeStyle = p.color + Math.floor(p.life * 180).toString(16).padStart(2,'0');
+      ctx.lineWidth = 2.5 * p.life;
+      ctx.stroke();
+    } else if (p.isDebris) {
+      // Small rotating rock chunk
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      const sz = p.size * p.life;
+      ctx.fillStyle = p.color + Math.floor(p.life * 220).toString(16).padStart(2,'0');
+      ctx.fillRect(-sz/2, -sz/2, sz, sz * 0.7);
+      ctx.restore();
+    } else {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+      ctx.fillStyle = p.color + Math.floor(p.life * 255).toString(16).padStart(2,'0');
+      ctx.fill();
+    }
     return true;
   });
 
@@ -688,6 +919,33 @@ function drawParticles(dt) {
     ctx.fill();
     return true;
   });
+}
+
+// ─── METEOR–METEOR COLLISIONS ────────────────────────────────────
+function checkMeteorCollisions() {
+  const toRemove = new Set();
+  for (let i = 0; i < meteors.length; i++) {
+    for (let j = i + 1; j < meteors.length; j++) {
+      if (toRemove.has(i) || toRemove.has(j)) continue;
+      const a = meteors[i], b = meteors[j];
+      // Only collide if both are large enough to be visible
+      if (a.size < 10 || b.size < 10) continue;
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      const minDist = (a.size + b.size) * 0.80;
+      if (dist < minDist && dist > 0) {
+        const t = a.size / (a.size + b.size);
+        const ix = a.x + dx * t, iy = a.y + dy * t;
+        splitMeteor(a, ix, iy);
+        splitMeteor(b, ix, iy);
+        toRemove.add(i);
+        toRemove.add(j);
+      }
+    }
+  }
+  if (toRemove.size > 0) {
+    meteors = meteors.filter((_, idx) => !toRemove.has(idx));
+  }
 }
 
 // ─── DEATH EFFECT ────────────────────────────────────────────────
@@ -749,7 +1007,6 @@ function updatePlayer(p, dt) {
   p.thrustOn = false;
   p.boosting = false;
 
-  // Build input direction vector
   let ix = 0, iy = 0;
   if (inp.right) ix += 1;
   if (inp.left)  ix -= 1;
@@ -758,7 +1015,17 @@ function updatePlayer(p, dt) {
 
   const moving = ix !== 0 || iy !== 0;
 
-  // Boost charge: drains while held, recharges when released
+  // ── Drift (idle float) ──
+  if (moving) {
+    // Snap out of drift quickly when player moves
+    p.driftEngaged = Math.max(0, p.driftEngaged - dt * 3.5);
+  } else {
+    // Drift slowly engages after ~0.5s of stillness
+    p.driftEngaged = Math.min(1, p.driftEngaged + dt * 0.8);
+    p.driftAngle  += dt * 1.4;   // ~4.5 second orbit
+  }
+
+  // Boost charge
   if (inp.boost && p.boostCharge > 0 && moving) {
     p.boostCharge = Math.max(0, p.boostCharge - dt * 0.55);
     p.boosting = true;
@@ -772,25 +1039,19 @@ function updatePlayer(p, dt) {
 
   if (moving) {
     p.thrustOn = true;
-    // Normalise diagonal so speed is consistent
     const len = Math.sqrt(ix*ix + iy*iy);
     const nx = ix / len, ny = iy / len;
     const acc = p.speed * boostMult;
     p.vx += nx * acc * dt;
     p.vy += ny * acc * dt;
 
-    // Smooth angle toward movement direction
     p.targetAngle = Math.atan2(ny, nx);
     let diff = p.targetAngle - p.angle;
-    // Wrap to shortest arc
     while (diff >  Math.PI) diff -= Math.PI * 2;
     while (diff < -Math.PI) diff += Math.PI * 2;
-    // Rotation speed: fast enough to feel responsive, slow enough to look smooth
-    const rotSpeed = 9;
-    p.angle += diff * Math.min(1, rotSpeed * dt);
+    p.angle += diff * Math.min(1, 9 * dt);
   }
 
-  // Speed cap (higher when boosting)
   const maxSpd = p.boosting ? 520 : 320;
   const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
   if (spd > maxSpd) { p.vx = p.vx/spd*maxSpd; p.vy = p.vy/spd*maxSpd; }
@@ -799,7 +1060,6 @@ function updatePlayer(p, dt) {
   p.vx *= drag; p.vy *= drag;
   p.x += p.vx * dt; p.y += p.vy * dt;
 
-  // Wrap around edges
   const pad = 20;
   if (p.x < -pad) p.x = W + pad;
   if (p.x > W+pad) p.x = -pad;
@@ -887,6 +1147,9 @@ function gameLoop(ts) {
       m.y += m.vy * dt;
       m.angle += m.spin * dt;
     });
+
+    // Meteor–meteor collisions
+    checkMeteorCollisions();
 
     // Remove off-screen meteors (with big margin)
     const margin = 150;
