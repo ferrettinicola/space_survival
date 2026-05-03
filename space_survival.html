@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>VOID RUNNER — Sopravvivi al cosmo</title>
+<title>SPACE RACE — Sopravvivi al cosmo</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap');
 
@@ -401,6 +401,31 @@
     box-shadow: 0 0 12px rgba(0,245,255,0.2);
   }
 
+  #lang-btn {
+    position: fixed; top: 18px; right: 22px;
+    font-family: 'Orbitron', sans-serif;
+    font-size: 11px; font-weight: 700;
+    letter-spacing: 0.18em;
+    color: rgba(200,232,248,0.55);
+    background: rgba(0,20,40,0.7);
+    border: 1px solid rgba(0,245,255,0.2);
+    border-radius: 3px;
+    padding: 8px 16px;
+    cursor: pointer;
+    z-index: 40;
+    pointer-events: all;
+    transition: all 0.15s;
+    backdrop-filter: blur(6px);
+  }
+  #lang-btn:hover { color: var(--cyan); border-color: var(--border); }
+
+  /* Score table in instructions */
+  .score-table { width: 100%; border-collapse: collapse; margin-top: 4px; }
+  .score-table td { padding: 8px 10px; font-size: 12px; border-bottom: 1px solid rgba(0,245,255,0.07); }
+  .score-table td:first-child { color: rgba(200,232,248,0.55); }
+  .score-table td:last-child { text-align: right; font-family: 'Orbitron', sans-serif; font-size: 11px; color: var(--gold); font-weight: 700; }
+  .score-table tr:last-child td { border-bottom: none; }
+
   /* General hidden utility */
   .hidden { display: none !important; }
 
@@ -447,28 +472,31 @@
 
 <canvas id="c"></canvas>
 
+<!-- Language toggle -->
+<button id="lang-btn" onclick="toggleLang()">🌐 EN</button>
+
 <!-- HUD -->
 <div class="hud" id="hud" style="display:none;">
-  <span><small>TEMPO</small><b id="hud-time">0:00</b></span>
-  <span><small>PUNTI</small><b id="hud-score">0</b></span>
-  <span><small>BOOST</small>
+  <span><small data-i="hud_time">TEMPO</small><b id="hud-time">0:00</b></span>
+  <span><small data-i="hud_score">PUNTI</small><b id="hud-score">0</b></span>
+  <span><small data-i="hud_boost">BOOST</small>
     <span id="boost-bar-wrap" style="display:flex;align-items:center;height:20px;gap:3px;">
       <span id="boost-bar" style="display:block;width:52px;height:6px;border-radius:3px;background:linear-gradient(90deg,#ffe040,#ff9000);border:1px solid rgba(255,220,0,0.4);transition:width 0.05s;"></span>
     </span>
   </span>
-  <span><small>RECORD</small><b id="hud-best">0</b></span>
+  <span><small data-i="hud_record">RECORD</small><b id="hud-best">0</b></span>
 </div>
 
 <!-- START SCREEN -->
 <div class="screen" id="screen-start">
-  <div class="logo">VOID RUNNER</div>
-  <div class="sub">SOPRAVVIVI AL COSMO</div>
+  <div class="logo">SPACE RACE</div>
+  <div class="sub" data-i="sub_tagline">SOPRAVVIVI AL COSMO</div>
   <div class="divider"></div>
-  <button class="btn" onclick="startGame()">INIZIA MISSIONE</button>
+  <button class="btn" onclick="startGame()" data-i="btn_start">INIZIA MISSIONE</button>
   <div class="start-actions">
-    <button class="side-btn" onclick="openModal('instructions')">? &nbsp;ISTRUZIONI</button>
-    <button class="side-btn" onclick="openModal('skins')">🚀 &nbsp;NAVE</button>
-    <button class="side-btn" onclick="openModal('leaderboard')">🏆 &nbsp;CLASSIFICA</button>
+    <button class="side-btn" onclick="openModal('instructions')" data-i="btn_instr">? &nbsp;ISTRUZIONI</button>
+    <button class="side-btn" onclick="openModal('skins')">🚀 &nbsp;<span data-i="btn_ship">NAVE</span></button>
+    <button class="side-btn" onclick="openModal('leaderboard')">🏆 &nbsp;<span data-i="btn_rank">CLASSIFICA</span></button>
   </div>
 </div>
 
@@ -479,32 +507,54 @@
 
     <!-- Skins panel -->
     <div id="modal-skins" class="hidden">
-      <div class="modal-title">SCEGLI LA TUA NAVE</div>
+      <div class="modal-title" data-i="modal_skins_title">SCEGLI LA TUA NAVE</div>
       <div class="skin-grid" id="skin-grid"></div>
     </div>
 
     <!-- Instructions panel -->
     <div id="modal-instructions" class="hidden">
-      <div class="modal-title">CONTROLLI</div>
-      <div class="instr-row">
-        <span class="instr-key">↑ ↓ ← →<br>W A S D</span>
-        <span class="instr-desc">Muovi la navicella nello spazio</span>
+      <div class="modal-title" data-i="modal_controls">CONTROLLI</div>
+
+      <!-- Tab switcher -->
+      <div style="display:flex;gap:10px;margin-bottom:16px;">
+        <button class="side-btn" id="tab-controls-btn" onclick="showInstrTab('controls')" style="flex:1;padding:8px;" data-i="tab_controls">🎮 CONTROLLI</button>
+        <button class="side-btn" id="tab-score-btn" onclick="showInstrTab('score')" style="flex:1;padding:8px;" data-i="tab_score">⭐ PUNTEGGIO</button>
       </div>
-      <div class="instr-row">
-        <span class="instr-key">SPAZIO</span>
-        <span class="instr-desc">Boost — accelerazione rapida (la barra gialla si svuota e si ricarica)</span>
+
+      <!-- Controls tab -->
+      <div id="tab-controls">
+        <div class="instr-row">
+          <span class="instr-key">↑ ↓ ← →<br>W A S D</span>
+          <span class="instr-desc" data-i="instr_move">Muovi la navicella nello spazio</span>
+        </div>
+        <div class="instr-row">
+          <span class="instr-key">SPAZIO</span>
+          <span class="instr-desc" data-i="instr_boost">Boost — accelerazione rapida (la barra gialla si svuota e si ricarica)</span>
+        </div>
+        <div class="instr-row">
+          <span class="instr-key danger">CLICK / F</span>
+          <span class="instr-desc" data-i="instr_fire">Spara nella direzione in cui punta la navicella</span>
+        </div>
+        <div class="instr-row">
+          <span class="instr-key" style="background:rgba(255,60,0,0.2);color:#ff6040;border:1px solid rgba(255,60,0,0.4);">⚠ ROSSE</span>
+          <span class="instr-desc" data-i="instr_red">Le meteore rosse sono molto più veloci — massima attenzione</span>
+        </div>
+        <div class="instr-row">
+          <span class="instr-key" style="background:rgba(0,20,40,0.6);color:#80e0ff;border:1px solid rgba(100,200,255,0.3);">🌀 B.NERI</span>
+          <span class="instr-desc" data-i="instr_bh">I buchi neri attirano la navicella — aumentano man mano che ti avvicini</span>
+        </div>
       </div>
-      <div class="instr-row">
-        <span class="instr-key danger">CLICK<br>oppure F</span>
-        <span class="instr-desc">Spara verso il cursore del mouse — i proiettili distruggono i meteoriti</span>
-      </div>
-      <div class="instr-row">
-        <span class="instr-key" style="background:rgba(0,245,255,0.15);color:var(--cyan);border:1px solid var(--border);">BORDI</span>
-        <span class="instr-desc">Lo schermo è ciclico — uscire da un lato fa rientrare dall'altro</span>
-      </div>
-      <div class="instr-row">
-        <span class="instr-key" style="background:rgba(255,60,0,0.2);color:#ff6040;border:1px solid rgba(255,60,0,0.4);">⚠ ROSSE</span>
-        <span class="instr-desc">Le meteore rosse sono molto più veloci — massima attenzione</span>
+
+      <!-- Score tab -->
+      <div id="tab-score" class="hidden">
+        <table class="score-table">
+          <tr><td data-i="sc_time">⏱ Ogni secondo sopravvissuto</td><td>+1 pt</td></tr>
+          <tr><td data-i="sc_normal">🪨 Meteora normale colpita</td><td>+3 pt</td></tr>
+          <tr><td data-i="sc_fast">🔴 Meteora rossa (veloce)</td><td>+5 pt</td></tr>
+          <tr><td data-i="sc_crystal">💎 Meteora cristallo</td><td>+7 pt</td></tr>
+          <tr><td data-i="sc_alien">👾 Navicella aliena (Scout/Caotico/Bomber)</td><td>+20 pt</td></tr>
+          <tr><td data-i="sc_dread">🛡 Dreadnought alieno (5 HP)</td><td>+50 pt</td></tr>
+        </table>
       </div>
     </div>
 
@@ -521,27 +571,27 @@
 
 <!-- GAME OVER SCREEN -->
 <div class="screen hidden" id="screen-over">
-  <div class="logo" style="font-size:clamp(24px,5vw,42px);color:var(--orange);text-shadow:0 0 20px rgba(255,107,53,0.8);">DISTRUTTO</div>
-  <div class="sub" style="margin-top:10px;">FINE MISSIONE</div>
+  <div class="logo" style="font-size:clamp(24px,5vw,42px);color:var(--orange);text-shadow:0 0 20px rgba(255,107,53,0.8);" data-i="over_title">DISTRUTTO</div>
+  <div class="sub" style="margin-top:10px;" data-i="over_sub">FINE MISSIONE</div>
   <div class="divider"></div>
-  <div class="final-label">SEI SOPRAVVISSUTO PER</div>
+  <div class="final-label" data-i="over_survived">SEI SOPRAVVISSUTO PER</div>
   <div class="final-time" id="final-time">0:00</div>
   <div style="font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:0.25em;color:var(--gold);margin-top:6px;text-shadow:0 0 10px var(--gold);">
-    PUNTEGGIO: <span id="final-score" style="font-size:20px;font-weight:900;">0</span> PT
+    <span data-i="over_score">PUNTEGGIO:</span> <span id="final-score" style="font-size:20px;font-weight:900;">0</span> PT
   </div>
   <div class="record-badge" id="record-badge"></div>
 
   <div class="name-row">
-    <input type="text" id="player-name" maxlength="16" placeholder="Il tuo nome..." autocomplete="off" spellcheck="false">
-    <button class="btn-sm" onclick="saveScore()">SALVA</button>
+    <input type="text" id="player-name" maxlength="16" data-i-placeholder="name_placeholder" placeholder="Il tuo nome..." autocomplete="off" spellcheck="false">
+    <button class="btn-sm" onclick="saveScore()" data-i="btn_save">SALVA</button>
   </div>
 
-  <div class="lb-title">CLASSIFICA</div>
+  <div class="lb-title" data-i="btn_rank">CLASSIFICA</div>
   <ul class="lb-list" id="lb-list"></ul>
 
   <div style="margin-top:28px; pointer-events:all; display:flex; gap:14px;">
-    <button class="btn" style="font-size:12px;padding:12px 28px;background:rgba(0,245,255,0.12);color:var(--cyan);box-shadow:none;border:1px solid var(--border);" onclick="showStart()">← MENU</button>
-    <button class="btn" onclick="startGame()">RIPROVA</button>
+    <button class="btn" style="font-size:12px;padding:12px 28px;background:rgba(0,245,255,0.12);color:var(--cyan);box-shadow:none;border:1px solid var(--border);" onclick="showStart()" data-i="btn_menu">← MENU</button>
+    <button class="btn" onclick="startGame()" data-i="btn_retry">RIPROVA</button>
   </div>
 </div>
 
@@ -981,6 +1031,112 @@ function drawSpaceObjects() {
     }
     ctx.restore();
   });
+}
+
+// ─── LANGUAGE (i18n) ─────────────────────────────────────────────
+let currentLang = localStorage.getItem('vr_lang') || 'it';
+
+const STRINGS = {
+  it: {
+    hud_time:'TEMPO', hud_score:'PUNTI', hud_boost:'BOOST', hud_record:'RECORD',
+    sub_tagline:'SOPRAVVIVI AL COSMO',
+    btn_start:'INIZIA MISSIONE', btn_instr:'? ISTRUZIONI', btn_ship:'NAVE',
+    btn_rank:'CLASSIFICA', btn_menu:'← MENU', btn_retry:'RIPROVA', btn_save:'SALVA',
+    over_title:'DISTRUTTO', over_sub:'FINE MISSIONE',
+    over_survived:'SEI SOPRAVVISSUTO PER', over_score:'PUNTEGGIO:',
+    name_placeholder:'Il tuo nome...',
+    modal_controls:'CONTROLLI',
+    modal_skins_title:'SCEGLI LA TUA NAVE',
+    tab_controls:'🎮 CONTROLLI', tab_score:'⭐ PUNTEGGIO',
+    instr_move:'Muovi la navicella nello spazio',
+    instr_boost:'Boost — accelerazione rapida (la barra gialla si svuota e si ricarica)',
+    instr_fire:'Spara nella direzione in cui punta la navicella',
+    instr_red:'Le meteore rosse sono molto più veloci — massima attenzione',
+    instr_bh:'I buchi neri attirano la navicella — aumentano man mano che ti avvicini',
+    sc_time:'⏱ Ogni secondo sopravvissuto',
+    sc_normal:'🪨 Meteora normale colpita',
+    sc_fast:'🔴 Meteora rossa (veloce)',
+    sc_crystal:'💎 Meteora cristallo',
+    sc_alien:'👾 Navicella aliena (Scout/Caotico/Bomber)',
+    sc_dread:'🛡 Dreadnought alieno (5 HP)',
+    record_badge:'★ NUOVO RECORD PERSONALE!',
+    skin_descs: [
+      'Bilanciata · fuoco standard',
+      'Veloce · proiettili pesanti lenti',
+      'Lenta · fuoco rapido perforante',
+      'Lentissima · raggio divisore',
+    ],
+  },
+  en: {
+    hud_time:'TIME', hud_score:'SCORE', hud_boost:'BOOST', hud_record:'BEST',
+    sub_tagline:'SURVIVE THE COSMOS',
+    btn_start:'START MISSION', btn_instr:'? HOW TO PLAY', btn_ship:'SHIP',
+    btn_rank:'LEADERBOARD', btn_menu:'← MENU', btn_retry:'RETRY', btn_save:'SAVE',
+    over_title:'DESTROYED', over_sub:'MISSION OVER',
+    over_survived:'YOU SURVIVED FOR', over_score:'SCORE:',
+    name_placeholder:'Your name...',
+    modal_controls:'CONTROLS',
+    modal_skins_title:'CHOOSE YOUR SHIP',
+    tab_controls:'🎮 CONTROLS', tab_score:'⭐ SCORING',
+    instr_move:'Move the ship through space',
+    instr_boost:'Boost — quick acceleration (yellow bar drains and recharges)',
+    instr_fire:'Fire in the direction the ship is facing',
+    instr_red:'Red meteors are much faster — maximum caution',
+    instr_bh:'Black holes pull the ship — gravity increases as you get closer',
+    sc_time:'⏱ Each second survived',
+    sc_normal:'🪨 Normal meteor hit',
+    sc_fast:'🔴 Red meteor (fast)',
+    sc_crystal:'💎 Crystal meteor',
+    sc_alien:'👾 Alien ship (Scout/Chaotic/Bomber)',
+    sc_dread:'🛡 Alien Dreadnought (5 HP)',
+    record_badge:'★ NEW PERSONAL RECORD!',
+    skin_descs: [
+      'Balanced · standard fire',
+      'Fast · slow heavy projectiles',
+      'Slow · rapid piercing fire',
+      'Very slow · splitting beam',
+    ],
+  }
+};
+
+function applyLang() {
+  const s = STRINGS[currentLang];
+  document.querySelectorAll('[data-i]').forEach(el => {
+    const key = el.getAttribute('data-i');
+    if (s[key]) el.textContent = s[key];
+  });
+  document.querySelectorAll('[data-i-placeholder]').forEach(el => {
+    const key = el.getAttribute('data-i-placeholder');
+    if (s[key]) el.placeholder = s[key];
+  });
+  document.getElementById('lang-btn').textContent = currentLang === 'it' ? '🌐 EN' : '🌐 IT';
+
+  // Update skin modal title if present
+  const skTitle = document.querySelector('#modal-skins .modal-title');
+  if (skTitle) skTitle.textContent = s.modal_skins_title;
+
+  // Re-render skin grid if it's currently visible (descriptions need updating)
+  const skGrid = document.getElementById('skin-grid');
+  if (skGrid && skGrid.children.length > 0) renderSkinGrid();
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'it' ? 'en' : 'it';
+  localStorage.setItem('vr_lang', currentLang);
+  applyLang();
+  // Re-render open modal panels
+  if (!document.getElementById('modal-bg').classList.contains('hidden')) {
+    if (!document.getElementById('modal-leaderboard').classList.contains('hidden')) renderLeaderboardModal();
+    if (!document.getElementById('modal-skins').classList.contains('hidden')) renderSkinGrid();
+  }
+}
+
+// ─── INSTRUCTION TABS ────────────────────────────────────────────
+function showInstrTab(tab) {
+  document.getElementById('tab-controls').classList.toggle('hidden', tab !== 'controls');
+  document.getElementById('tab-score').classList.toggle('hidden', tab !== 'score');
+  document.getElementById('tab-controls-btn').style.borderColor = tab==='controls' ? 'var(--cyan)' : '';
+  document.getElementById('tab-score-btn').style.borderColor = tab==='score' ? 'var(--cyan)' : '';
 }
 
 // ─── LOCALSTORAGE ────────────────────────────────────────────────
@@ -1583,17 +1739,58 @@ function checkMeteorCollisions() {
 
 // ─── DEATH EFFECT ────────────────────────────────────────────────
 function spawnDeathExplosion(x, y) {
-  for (let i = 0; i < 60; i++) {
-    const a = Math.random() * Math.PI * 2;
-    const sp = Math.random() * 300 + 50;
-    particles.push({
-      x, y,
+  const skinAccent = SKINS[selectedSkin]?.accent || '#00f5ff';
+
+  // Shockwave rings (3 expanding)
+  [0.18, 0.32, 0.50].forEach(ml => {
+    particles.push({ x, y, vx:0, vy:0, life:1, maxLife:ml,
+      size: 80 + ml*200, color: skinAccent, isRing:true });
+  });
+
+  // Central flash (big bright circle)
+  particles.push({ x, y, vx:0, vy:0, life:1, maxLife:0.12,
+    size: 55, color:'#ffffff', isRing:true });
+
+  // Hull debris — large coloured chunks
+  for (let i = 0; i < 18; i++) {
+    const a = Math.random()*Math.PI*2, sp = Math.random()*280+80;
+    particles.push({ x, y,
       vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
-      life: 1,
-      maxLife: Math.random() * 1.2 + 0.4,
-      size: Math.random() * 8 + 2,
-      color: ['#00f5ff','#ff6b35','#ffd700','#ffffff'][Math.floor(Math.random()*4)],
-    });
+      life:1, maxLife: Math.random()*1.4+0.5,
+      size: Math.random()*10+4,
+      color: [skinAccent, '#ff6b35', '#ffd700', '#ffffff'][Math.floor(Math.random()*4)],
+      isDebris: true });
+  }
+
+  // Fire particles — medium, hot
+  for (let i = 0; i < 50; i++) {
+    const a = Math.random()*Math.PI*2, sp = Math.random()*380+60;
+    const hot = Math.random() > 0.5;
+    particles.push({ x, y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life:1, maxLife: Math.random()*0.9+0.3,
+      size: Math.random()*7+2,
+      color: hot ? '#ff8c00' : '#ff3300' });
+  }
+
+  // Sparks — fast, tiny
+  for (let i = 0; i < 40; i++) {
+    const a = Math.random()*Math.PI*2, sp = Math.random()*600+150;
+    particles.push({ x, y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life:1, maxLife: Math.random()*0.4+0.1,
+      size: Math.random()*2.5+0.5,
+      color: Math.random()>0.4 ? '#ffee44' : skinAccent });
+  }
+
+  // Smoke puffs — slow, large, dark
+  for (let i = 0; i < 15; i++) {
+    const a = Math.random()*Math.PI*2, sp = Math.random()*80+20;
+    particles.push({ x, y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
+      life:1, maxLife: Math.random()*1.8+0.8,
+      size: Math.random()*18+8,
+      color: '#222233' });
   }
 }
 
@@ -1830,7 +2027,7 @@ function updateAndDrawAlienBullets(dt) {
     const dx = b.x - player.x, dy = b.y - player.y;
     if (Math.sqrt(dx*dx+dy*dy) < player.radius + 5) {
       spawnDeathExplosion(player.x, player.y);
-      state = 'dead'; showGameOver();
+      state = 'dead'; setTimeout(showGameOver, 1400);
       return false;
     }
 
@@ -2156,7 +2353,7 @@ function updatePlayer(p, dt) {
       // Instant kill at event horizon
       if (dist < bh.r * 1.05) {
         spawnDeathExplosion(p.x, p.y);
-        state = 'dead'; showGameOver(); return;
+        state = 'dead'; setTimeout(showGameOver, 1400); return;
       }
     }
   }
@@ -2324,7 +2521,9 @@ function gameLoop(ts) {
     for (const m of meteors) {
       if (checkCollision(player, m)) {
         spawnDeathExplosion(player.x, player.y);
-        state = 'dead'; showGameOver(); break;
+        state = 'dead';
+        setTimeout(showGameOver, 1400);
+        break;
       }
     }
 
@@ -2351,6 +2550,7 @@ function gameLoop(ts) {
   } else if (state === 'dead') {
     ctx.save();
     ctx.translate(W/2 - camera.x, H/2 - camera.y);
+    drawSpaceObjects();
     meteors.forEach(m => drawMeteor(m));
     drawParticles(dt);
     ctx.restore();
@@ -2376,7 +2576,7 @@ function showGameOver() {
 
   const bestScore = parseInt(localStorage.getItem('vr_best_score') || '0');
   const isRecord = Math.floor(score) > bestScore;
-  document.getElementById('record-badge').textContent = isRecord ? '★ NUOVO RECORD PERSONALE!' : '';
+  document.getElementById('record-badge').textContent = isRecord ? STRINGS[currentLang].record_badge : '';
 
   const nameInput = document.getElementById('player-name');
   nameInput.value = savedName;
@@ -2413,28 +2613,31 @@ function openModal(which) {
 }
 
 function renderSkinGrid() {
+  const s = STRINGS[currentLang];
   const grid = document.getElementById('skin-grid');
   grid.innerHTML = '';
+
+  // Update modal title
+  const skTitle = document.querySelector('#modal-skins .modal-title');
+  if (skTitle) skTitle.textContent = s.modal_skins_title;
+
   SKINS.forEach(sk => {
     const card = document.createElement('div');
     card.className = 'skin-card' + (sk.id === selectedSkin ? ' selected' : '');
     card.style.borderColor = sk.id === selectedSkin ? sk.accent : '';
     card.style.boxShadow = sk.id === selectedSkin ? `0 0 18px ${sk.accent}40` : '';
 
-    // Preview canvas
     const cv = document.createElement('canvas');
     cv.width = 110; cv.height = 110;
     const pc = cv.getContext('2d');
     pc.clearRect(0, 0, 110, 110);
-    // Background
     const bg = pc.createRadialGradient(55, 55, 0, 55, 55, 55);
     bg.addColorStop(0, 'rgba(10,25,45,0.9)');
     bg.addColorStop(1, 'rgba(2,6,14,0)');
     pc.fillStyle = bg; pc.fillRect(0, 0, 110, 110);
-    // Draw ship centered, rotated to face up
     pc.save();
     pc.translate(55, 60);
-    pc.rotate(Math.PI / 2);  // face right → rotate to face up
+    pc.rotate(Math.PI / 2);
     pc.scale(1.7, 1.7);
     drawShipBody(pc, sk.id, false, false);
     pc.restore();
@@ -2446,7 +2649,7 @@ function renderSkinGrid() {
 
     const desc = document.createElement('div');
     desc.className = 'skin-desc';
-    desc.textContent = sk.desc;
+    desc.textContent = s.skin_descs[sk.id] || sk.desc;
 
     card.appendChild(cv);
     card.appendChild(name);
@@ -2455,7 +2658,7 @@ function renderSkinGrid() {
     card.addEventListener('click', () => {
       selectedSkin = sk.id;
       localStorage.setItem('vr_skin', sk.id);
-      renderSkinGrid(); // re-render to update selection
+      renderSkinGrid();
     });
 
     grid.appendChild(card);
@@ -2542,6 +2745,7 @@ function startGame() {
 // ─── INIT ────────────────────────────────────────────────────────
 initStars();
 buildNebula();
+applyLang();
 showStart();
 
 lastTime = performance.now();
