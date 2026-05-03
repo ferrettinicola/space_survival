@@ -479,9 +479,14 @@
 <div class="hud" id="hud" style="display:none;">
   <span><small data-i="hud_time">TEMPO</small><b id="hud-time">0:00</b></span>
   <span><small data-i="hud_score">PUNTI</small><b id="hud-score">0</b></span>
-  <span><small data-i="hud_boost">BOOST</small>
+  <span id="boost-hud-slot"><small data-i="hud_boost">BOOST</small>
     <span id="boost-bar-wrap" style="display:flex;align-items:center;height:20px;gap:3px;">
       <span id="boost-bar" style="display:block;width:52px;height:6px;border-radius:3px;background:linear-gradient(90deg,#ffe040,#ff9000);border:1px solid rgba(255,220,0,0.4);transition:width 0.05s;"></span>
+    </span>
+  </span>
+  <span><small data-i="hud_ammo">FUOCO</small>
+    <span style="display:flex;align-items:center;height:20px;gap:3px;">
+      <span id="ammo-bar" style="display:block;width:52px;height:6px;border-radius:3px;background:linear-gradient(90deg,#00f5ff,#0060ff);border:1px solid rgba(0,200,255,0.4);transition:width 0.05s;"></span>
     </span>
   </span>
   <span><small data-i="hud_record">RECORD</small><b id="hud-best">0</b></span>
@@ -1051,7 +1056,7 @@ let currentLang = localStorage.getItem('vr_lang') || 'it';
 
 const STRINGS = {
   it: {
-    hud_time:'TEMPO', hud_score:'PUNTI', hud_boost:'BOOST', hud_record:'RECORD',
+    hud_time:'TEMPO', hud_score:'PUNTI', hud_boost:'BOOST', hud_record:'RECORD', hud_ammo:'FUOCO',
     sub_tagline:'SOPRAVVIVI AL COSMO',
     btn_start:'INIZIA MISSIONE', btn_instr:'? ISTRUZIONI', btn_ship:'NAVE',
     btn_rank:'CLASSIFICA', btn_menu:'← MENU', btn_retry:'RIPROVA', btn_save:'SALVA',
@@ -1081,7 +1086,7 @@ const STRINGS = {
     ],
   },
   en: {
-    hud_time:'TIME', hud_score:'SCORE', hud_boost:'BOOST', hud_record:'BEST',
+    hud_time:'TIME', hud_score:'SCORE', hud_boost:'BOOST', hud_record:'BEST', hud_ammo:'AMMO',
     sub_tagline:'SURVIVE THE COSMOS',
     btn_start:'START MISSION', btn_instr:'? HOW TO PLAY', btn_ship:'SHIP',
     btn_rank:'LEADERBOARD', btn_menu:'← MENU', btn_retry:'RETRY', btn_save:'SAVE',
@@ -1375,6 +1380,8 @@ function makePlayer() {
     driftEngaged: 0,
     driftRadius: 7,
     shootCooldown: 0,
+    ammoCharge: 1,      // 0..1 — shared ammo pool for all shots
+    ammoFiring: false,  // true while holding fire
   };
 }
 
@@ -1579,10 +1586,63 @@ function drawMeteor(m) {
     });
   }
   const glow = 0.10 + Math.sin(m.glowPulse) * 0.04;
-
-  const {x: wx, y: wy} = wrapAdjust(m.x, m.y);
-
+  // For normal meteors: wrap around world edges. For void meteors: use direct coords.
+  const {x: wx, y: wy} = m.isVoidMeteor ? {x: m.x, y: m.y} : wrapAdjust(m.x, m.y);
+  // Light angle shared by both render paths
   const la = m.lightAngle + m.angle * 0.4;
+  if (m.isVoidMeteor) {
+    const lx = Math.cos(la), ly = Math.sin(la);
+    const hx = lx * m.size * 0.35, hy = ly * m.size * 0.35;
+
+    ctx.save();
+    ctx.translate(wx, wy);
+    ctx.rotate(m.angle);
+
+    // Outer violet glow
+    const og = ctx.createRadialGradient(0,0,m.size*0.3,0,0,m.size*1.5);
+    og.addColorStop(0,'rgba(120,0,255,0.18)');
+    og.addColorStop(1,'rgba(60,0,120,0)');
+    ctx.beginPath(); ctx.arc(0,0,m.size*1.5,0,Math.PI*2); ctx.fillStyle=og; ctx.fill();
+
+    // Rock shape
+    ctx.beginPath();
+    m.shape.forEach((p,i) => {
+      if(i===0) ctx.moveTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
+      else ctx.lineTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
+    });
+    ctx.closePath();
+    ctx.save(); ctx.clip();
+
+    // Base: obsidian black with slight lit face
+    const rg = ctx.createRadialGradient(hx,hy,0,0,0,m.size*1.1);
+    rg.addColorStop(0,'#1a0028');   // lit — dark purple-black
+    rg.addColorStop(0.45,'#0d0015');
+    rg.addColorStop(1,'#050008');   // shadow — near total black
+    ctx.fillStyle=rg; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
+
+    // Shadow
+    const shd=ctx.createRadialGradient(-hx,-hy,0,-hx,-hy,m.size*1.2);
+    shd.addColorStop(0,'rgba(0,0,0,0.7)'); shd.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=shd; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
+
+    // Specular (faint violet sheen)
+    const sp=ctx.createRadialGradient(hx,hy,0,hx,hy,m.size*0.4);
+    sp.addColorStop(0,'rgba(180,100,255,0.35)');
+    sp.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=sp; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
+    ctx.restore();
+
+    // Outline
+    ctx.beginPath();
+    m.shape.forEach((p,i) => {
+      if(i===0) ctx.moveTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
+      else ctx.lineTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
+    });
+    ctx.closePath();
+    ctx.strokeStyle='rgba(140,60,255,0.5)'; ctx.lineWidth=1; ctx.stroke();
+    ctx.restore();
+    return;  // early exit — skip normal rendering
+  }
   const lx = Math.cos(la), ly = Math.sin(la);
   const hx = lx * m.size * 0.35, hy = ly * m.size * 0.35;
   const sx = -lx * m.size * 0.3, sy = -ly * m.size * 0.3;
@@ -2321,7 +2381,7 @@ function enterVoid(bh) {
   setTimeout(() => {
     player.x = 5000; player.y = 5000;
     player.vx = 0; player.vy = 0;
-    for (let i=0; i<5; i++) spawnVoidMeteor();
+    for (let i=0; i<8; i++) spawnVoidMeteor();
   }, 2800);
 }
 
@@ -2337,16 +2397,15 @@ function exitVoid() {
 
 function spawnVoidMeteor() {
   const side = Math.floor(Math.random()*4);
-  const s = Math.random()*30+15;
-  const speed = Math.random()*70+30;
+  const s = Math.random()*32+18;
+  const speed = Math.random()*110+70;  // much faster than normal
   let x, y, vx, vy;
   if (side===0){ x=voidCamera.x-W/2-s; y=voidCamera.y+(Math.random()-0.5)*H; vx=speed; vy=(Math.random()-0.5)*speed; }
   else if(side===1){ x=voidCamera.x+W/2+s; y=voidCamera.y+(Math.random()-0.5)*H; vx=-speed; vy=(Math.random()-0.5)*speed; }
   else if(side===2){ x=voidCamera.x+(Math.random()-0.5)*W; y=voidCamera.y-H/2-s; vx=(Math.random()-0.5)*speed; vy=speed; }
   else            { x=voidCamera.x+(Math.random()-0.5)*W; y=voidCamera.y+H/2+s; vx=(Math.random()-0.5)*speed; vy=-speed; }
-  // Void meteors are dark purple-grey with faint glow
   const m = makeMeteor(s, x, y, vx, vy, false, false);
-  m.isVoidMeteor = true;
+  m.isVoidMeteor = true;  // flagged for black rendering
   voidMeteors.push(m);
 }
 
@@ -2617,8 +2676,8 @@ function updateVoid(dt) {
     return;
   }
 
-  // 1.5× time acceleration
-  const vdt = dt * 1.5;
+  // 1.875× time acceleration (25% faster than current 1.5×)
+  const vdt = dt * 1.875;
   voidElapsed += vdt;
   score += vdt; // score also 1.5× in void
 
@@ -2628,7 +2687,7 @@ function updateVoid(dt) {
 
   // Spawn void meteors
   voidSpawnTimer += vdt;
-  if (voidSpawnTimer > 1.2) { voidSpawnTimer=0; spawnVoidMeteor(); }
+  if (voidSpawnTimer > 0.8) { voidSpawnTimer=0; spawnVoidMeteor(); }
 
   // Update void meteors
   voidMeteors.forEach(m => {
@@ -2696,12 +2755,8 @@ function updateVoid(dt) {
   ctx.save();
   ctx.translate(W/2 - voidCamera.x, H/2 - voidCamera.y);
 
-  // Draw void meteors (darker tint)
-  ctx.save();
-  ctx.filter = 'hue-rotate(200deg) saturate(0.4) brightness(0.6)';
+  // Draw void meteors (black style handled inside drawMeteor via isVoidMeteor flag)
   voidMeteors.forEach(m => drawMeteor(m));
-  ctx.filter = 'none';
-  ctx.restore();
 
   // Draw void particles
   voidParticles.forEach(p => {
@@ -2755,8 +2810,11 @@ function updateVoid(dt) {
 
 function voidShoot() {
   if (!player || player.shootCooldown > 0) return;
+  if (player.ammoCharge <= 0) return;
   const stats = SHIP_STATS[selectedSkin] || SHIP_STATS[0];
-  player.shootCooldown = stats.cooldown * 0.8; // slightly faster in void
+  player.shootCooldown = stats.cooldown * 0.8;
+  player.ammoFiring = true;
+  player.ammoCharge = Math.max(0, player.ammoCharge - 0.065); // slightly more expensive in void
   const aimAngle = player.angle;
   voidBullets.push({
     x: player.x + Math.cos(aimAngle)*16,
@@ -2783,8 +2841,12 @@ canvas.addEventListener('mousedown', e => {
 // ─── BULLETS ─────────────────────────────────────────────────────
 function tryShoot() {
   if (!player || player.shootCooldown > 0) return;
+  if (player.ammoCharge <= 0) return;           // no ammo — can't fire
   const stats = SHIP_STATS[selectedSkin] || SHIP_STATS[0];
   player.shootCooldown = stats.cooldown;
+  player.ammoFiring = true;
+  // Each shot costs a fraction of total ammo (drain rate: full clip in ~5s of holding)
+  player.ammoCharge = Math.max(0, player.ammoCharge - 0.055);
 
   const aimAngle = player.angle;
   const speed = stats.bulletSpeed;
@@ -2799,7 +2861,7 @@ function tryShoot() {
     life: 1,
     maxLife: stats.bulletType === 'rapid' ? 0.9 : 1.4,
     type: stats.bulletType,
-    pierces: stats.bulletType === 'rapid' ? 2 : 0, // rapid pierces up to 2 meteors
+    pierces: stats.bulletType === 'rapid' ? 2 : 0,
   });
 }
 
@@ -3030,6 +3092,12 @@ function updatePlayer(p, dt) {
     p.boostCharge = Math.min(1, p.boostCharge + dt * 0.28);
   }
 
+  // Ammo recharges when not actively firing (slower drain, faster recharge than boost)
+  if (!inp.fire) {
+    p.ammoFiring = false;
+    p.ammoCharge = Math.min(1, p.ammoCharge + dt * 0.18); // ~5.5s full recharge
+  }
+
   // F key fires
   if (inp.fire) { if (inVoid) voidShoot(); else tryShoot(); }
 
@@ -3127,15 +3195,23 @@ function gameLoop(ts) {
     // ── VOID DIMENSION (inside black hole) ──
     if (inVoid) {
       updateVoid(dt);
-      // HUD update still runs
+      // Void HUD — no boost bar, ammo bar purple
       document.getElementById('hud-time').textContent = fmtTime(elapsed);
       document.getElementById('hud-score').textContent = Math.floor(score);
-      const bar = document.getElementById('boost-bar');
-      bar.style.width = Math.round(player.boostCharge * 52) + 'px';
-      bar.style.opacity = player.boostCharge < 0.15 ? '0.35' : '1';
+      document.getElementById('boost-hud-slot').style.display = 'none';
+      const ammoBarV = document.getElementById('ammo-bar');
+      ammoBarV.style.width = Math.round(player.ammoCharge * 52) + 'px';
+      ammoBarV.style.opacity = player.ammoCharge < 0.12 ? '0.3' : '1';
+      ammoBarV.style.background = player.ammoCharge < 0.25
+        ? 'linear-gradient(90deg,#ff4444,#ff0000)'
+        : 'linear-gradient(90deg,#cc44ff,#8800ff)';
+      // Force boost off inside void
+      player.boosting = false;
       animId = requestAnimationFrame(gameLoop);
       return;
     }
+    // Restore boost bar when back in normal world
+    document.getElementById('boost-hud-slot').style.display = '';
     elapsed += dt;
     score += dt; // 1 point per second survived
 
@@ -3219,6 +3295,13 @@ function gameLoop(ts) {
     const pct = Math.round(player.boostCharge * 52);
     bar.style.width = pct + 'px';
     bar.style.opacity = player.boostCharge < 0.15 ? '0.35' : '1';
+    const ammoBar = document.getElementById('ammo-bar');
+    const ammoPct = Math.round(player.ammoCharge * 52);
+    ammoBar.style.width = ammoPct + 'px';
+    ammoBar.style.opacity = player.ammoCharge < 0.12 ? '0.3' : '1';
+    ammoBar.style.background = player.ammoCharge < 0.25
+      ? 'linear-gradient(90deg,#ff4444,#ff0000)'
+      : 'linear-gradient(90deg,#00f5ff,#0060ff)';
     const bestScore = parseInt(localStorage.getItem('vr_best_score') || '0');
     document.getElementById('hud-best').textContent = bestScore;
 
