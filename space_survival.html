@@ -700,12 +700,12 @@ function initWorld() {
     [255,120,60],[80,200,150],[200,140,255],[255,180,80],[60,200,220],
   ];
 
-  // ── Galaxies (15) ──
-  for (let i = 0; i < 15; i++) {
+  // ── Galaxies (40) ──
+  for (let i = 0; i < 40; i++) {
     spaceObjects.push({
       type: 'galaxy',
       wx: Math.random() * WORLD_W, wy: Math.random() * WORLD_H,
-      rx: 280 + Math.random()*220, ry: 90 + Math.random()*100,
+      rx: 380 + Math.random()*320, ry: 120 + Math.random()*140,
       angle: Math.random() * Math.PI,
       color: [
         Math.floor(150+Math.random()*105),
@@ -715,8 +715,8 @@ function initWorld() {
     });
   }
 
-  // ── Nebula patches (12) ──
-  for (let i = 0; i < 12; i++) {
+  // ── Nebula patches (35) — large and vivid ──
+  for (let i = 0; i < 35; i++) {
     const hue = Math.random();
     let r=10,g=10,b=80;
     if (hue < 0.25)      { r=80;g=0;b=120; }
@@ -726,52 +726,52 @@ function initWorld() {
     spaceObjects.push({
       type:'nebula',
       wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 900 + Math.random()*700,
-      color:[r, g, b, 0.08 + Math.random()*0.05],
+      r: 1800 + Math.random()*2200,   // much bigger — always visible from distance
+      color:[r, g, b, 0.09 + Math.random()*0.07],
     });
   }
 
-  // ── Star clusters (8) ──
-  for (let i = 0; i < 8; i++) {
+  // ── Star clusters (22) ──
+  for (let i = 0; i < 22; i++) {
     const obj = {
       type:'cluster',
       wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 160 + Math.random()*200,
-      count: 60 + Math.floor(Math.random()*80),
+      r: 200 + Math.random()*280,
+      count: 80 + Math.floor(Math.random()*100),
       stars: null,
     };
     obj.stars = Array.from({length: obj.count}, () => ({
       dx: (Math.random()-0.5)*2*obj.r,
       dy: (Math.random()-0.5)*2*obj.r,
-      r:  Math.random()*1.8+0.3,
-      alpha: Math.random()*0.6+0.3,
+      r:  Math.random()*2.0+0.4,
+      alpha: Math.random()*0.7+0.3,
     })).filter(s => Math.sqrt(s.dx*s.dx+s.dy*s.dy) < obj.r);
     spaceObjects.push(obj);
   }
 
-  // ── Asteroid belts (visual only, decorative rings) ──
-  for (let i = 0; i < 6; i++) {
+  // ── Asteroid belts (16) ──
+  for (let i = 0; i < 16; i++) {
     spaceObjects.push({
       type: 'belt',
       wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      rx: 300 + Math.random()*400, ry: 80 + Math.random()*120,
+      rx: 350 + Math.random()*500, ry: 90 + Math.random()*140,
       angle: Math.random()*Math.PI,
-      count: 60 + Math.floor(Math.random()*80),
-      seeds: Array.from({length:160}, () => ({
-        t: Math.random(), // 0..1 along ellipse
-        r: Math.random()*4+1,
-        alpha: Math.random()*0.5+0.15,
-        spread: (Math.random()-0.5)*30,
+      count: 80 + Math.floor(Math.random()*100),
+      seeds: Array.from({length:180}, () => ({
+        t: Math.random(),
+        r: Math.random()*5+1,
+        alpha: Math.random()*0.55+0.18,
+        spread: (Math.random()-0.5)*35,
       })),
     });
   }
 
-  // ── Pulsars (rotating bright beams) ──
-  for (let i = 0; i < 5; i++) {
+  // ── Pulsars (14) ──
+  for (let i = 0; i < 14; i++) {
     spaceObjects.push({
       type: 'pulsar',
       wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 12 + Math.random()*10,
+      r: 14 + Math.random()*14,
       beamAngle: Math.random()*Math.PI*2,
       beamSpeed: 1.5 + Math.random()*2.5,
       color: [
@@ -782,26 +782,24 @@ function initWorld() {
     });
   }
 
-  // ── Supernovas / space anomalies ──
-  for (let i = 0; i < 7; i++) {
+  // ── Supernovas / space anomalies (20) ──
+  const snovaCols = [[255,100,30],[255,200,80],[80,200,255],[255,60,180],[120,255,180],[255,255,100],[200,100,255]];
+  for (let i = 0; i < 20; i++) {
     spaceObjects.push({
       type: 'supernova',
       wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 180 + Math.random()*280,
-      color: [
-        [255,100,30], [255,200,80], [80,200,255],
-        [255,60,180], [120,255,180], [255,255,100], [200,100,255],
-      ][i % 7],
+      r: 250 + Math.random()*380,     // bigger
+      color: snovaCols[i % snovaCols.length],
       phase: Math.random()*Math.PI*2,
     });
   }
 
-  // ── Space dust clouds (faint swirling patches) ──
-  for (let i = 0; i < 15; i++) {
+  // ── Space dust clouds (40) — very large, set the mood ──
+  for (let i = 0; i < 40; i++) {
     spaceObjects.push({
       type: 'dust',
       wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 400 + Math.random()*600,
+      r: 900 + Math.random()*1400,
       color: [
         Math.floor(Math.random()*80+20),
         Math.floor(Math.random()*80+20),
@@ -809,34 +807,34 @@ function initWorld() {
       ],
     });
   }
+
+  // ── Black holes (20) ──
   blackHoles = [];
   for (let i = 0; i < 20; i++) {
     const bh = {
       type:'blackhole',
       wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 55 + Math.random()*55,    // radius 55-110
+      r: 55 + Math.random()*55,
       diskAngle: Math.random()*Math.PI*2,
     };
     spaceObjects.push(bh);
     blackHoles.push(bh);
   }
 
-  // ── Planets (75) — avoid tight cluster near spawn ──
+  // ── Planets (220) — large, spread evenly ──
   const cx = WORLD_W/2, cy = WORLD_H/2;
   let placed = 0;
-  while (placed < 75) {
+  while (placed < 220) {
     const wx = Math.random()*WORLD_W, wy = Math.random()*WORLD_H;
-    const distFromCenter = Math.sqrt((wx-cx)**2+(wy-cy)**2);
-    if (distFromCenter < 600) continue; // keep spawn area clear
-    const r = 35 + Math.random()*100;
+    const r = 70 + Math.random()*140;   // bigger: 70–210
     const color = PLANET_COLORS[Math.floor(Math.random()*PLANET_COLORS.length)];
-    const rings = Math.random() < 0.35;
+    const rings = Math.random() < 0.38;
     const moonCount = Math.floor(Math.random()*3);
     const moons = Array.from({length: moonCount}, () => ({
-      r: 6 + Math.floor(Math.random()*14),
-      orbit: r*(1.35 + Math.random()*0.8),
+      r: 7 + Math.floor(Math.random()*16),
+      orbit: r*(1.4 + Math.random()*0.9),
       angle: Math.random()*Math.PI*2,
-      speed: 0.09 + Math.random()*0.42,
+      speed: 0.08 + Math.random()*0.40,
     }));
     spaceObjects.push({ type:'planet', wx, wy, r, color, rings, moons });
     placed++;
@@ -850,7 +848,9 @@ function drawSpaceObjects() {
     const sx = wx - camera.x + W/2, sy = wy - camera.y + H/2;
     const cullR = obj.type === 'blackhole'
       ? (obj.r || 80) * 20
-      : (obj.r || obj.rx || 250) * 2.5;
+      : obj.type === 'nebula' || obj.type === 'dust'
+        ? (obj.r || 500)         // nebulae are huge, always draw
+        : (obj.r || obj.rx || 250) * 4; // 4× buffer for planets/galaxies
     if (sx < -cullR || sx > W+cullR || sy < -cullR || sy > H+cullR) return;
 
     ctx.save();
@@ -3298,6 +3298,14 @@ function gameLoop(ts) {
   drawBackground();
   drawStars(dt);
 
+  // Space objects (planets, galaxies, nebulae) always visible
+  if (!inVoid) {
+    ctx.save();
+    ctx.translate(W/2 - camera.x, H/2 - camera.y);
+    drawSpaceObjects();
+    ctx.restore();
+  }
+
   if (state === 'playing') {
 
     // ── VOID DIMENSION (inside black hole) ──
@@ -3367,7 +3375,6 @@ function gameLoop(ts) {
     ctx.save();
     ctx.translate(W/2 - camera.x, H/2 - camera.y);
 
-    drawSpaceObjects();
     drawParticles(dt);
     meteors.forEach(m => drawMeteor(m));
     updateAndDrawBullets(dt);
@@ -3416,7 +3423,6 @@ function gameLoop(ts) {
   } else if (state === 'dead') {
     ctx.save();
     ctx.translate(W/2 - camera.x, H/2 - camera.y);
-    drawSpaceObjects();
     meteors.forEach(m => drawMeteor(m));
     drawParticles(dt);
     ctx.restore();
@@ -3616,6 +3622,7 @@ function startGame() {
 // ─── INIT ────────────────────────────────────────────────────────
 initStars();
 buildNebula();
+initWorld();   // populate planets/galaxies so start screen is full
 applyLang();
 showStart();
 
