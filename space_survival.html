@@ -439,39 +439,50 @@
   .skin-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: 10px;
     margin-top: 4px;
   }
   .skin-card {
     background: rgba(0,245,255,0.04);
     border: 1px solid rgba(0,245,255,0.15);
     border-radius: 5px;
-    padding: 14px 12px 12px;
+    padding: 12px 10px 10px;
     cursor: pointer;
     transition: all 0.15s;
-    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    display: flex; flex-direction: column; align-items: center; gap: 6px;
     pointer-events: all;
+    position: relative;
   }
-  .skin-card:hover {
-    background: rgba(0,245,255,0.09);
-    border-color: rgba(0,245,255,0.4);
-  }
-  .skin-card.selected {
-    border-width: 2px;
-    box-shadow: 0 0 16px rgba(0,245,255,0.2);
-  }
+  .skin-card:hover { background: rgba(0,245,255,0.09); border-color: rgba(0,245,255,0.4); }
+  .skin-card.selected { border-width: 2px; box-shadow: 0 0 16px rgba(0,245,255,0.2); }
   .skin-card canvas { border-radius: 3px; }
-  .skin-card .skin-name {
-    font-family: 'Orbitron', sans-serif;
-    font-size: 11px; font-weight: 700;
-    letter-spacing: 0.22em;
+  .skin-card .skin-name { font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.22em; }
+  .skin-card .skin-desc { font-size: 10px; color: rgba(200,232,248,0.45); letter-spacing: 0.08em; text-align: center; }
+  .skin-card .skin-ability-badge {
+    font-size: 9px; font-family: 'Orbitron',sans-serif; letter-spacing:0.12em;
+    background: rgba(255,215,0,0.12); border: 1px solid rgba(255,215,0,0.3);
+    border-radius: 3px; padding: 2px 6px; color: var(--gold);
   }
-  .skin-card .skin-desc {
-    font-size: 10px;
-    color: rgba(200,232,248,0.45);
-    letter-spacing: 0.1em;
-    text-align: center;
+
+  /* Ship detail panel */
+  #ship-detail {
+    display: none; margin-top: 12px;
+    background: rgba(0,0,0,0.35); border: 1px solid var(--border);
+    border-radius: 5px; padding: 14px 16px; pointer-events: all;
   }
+  .stat-row { display:flex; justify-content:space-between; align-items:center; padding: 5px 0; border-bottom:1px solid rgba(0,245,255,0.06); }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-label { font-size: 10px; color: rgba(200,232,248,0.5); letter-spacing:0.15em; }
+  .stat-bar-wrap { display:flex; align-items:center; gap:6px; }
+  .stat-bar { height:5px; border-radius:3px; }
+  .stat-val { font-family:'Orbitron',sans-serif; font-size:10px; font-weight:700; }
+  .ability-box {
+    margin-top:10px; padding:8px 10px;
+    background: rgba(255,215,0,0.06); border: 1px solid rgba(255,215,0,0.25);
+    border-radius:4px;
+  }
+  .ability-title { font-family:'Orbitron',sans-serif; font-size:9px; letter-spacing:0.25em; color:var(--gold); margin-bottom:4px; }
+  .ability-desc { font-size:11px; color: rgba(200,232,248,0.7); line-height:1.5; }
 </style>
 </head>
 <body>
@@ -485,10 +496,13 @@
 <div class="hud" id="hud" style="display:none;">
   <span>
     <small data-i="hud_hp">VITA</small>
-    <span style="display:flex;align-items:center;height:20px;gap:2px;" id="hp-hearts"></span>
+    <span style="display:flex;flex-direction:column;align-items:center;gap:2px;">
+      <span id="hp-bar-outer" style="display:block;width:100px;height:8px;background:rgba(255,255,255,0.12);border-radius:4px;border:1px solid rgba(255,80,80,0.3);overflow:hidden;">
+        <span id="hp-bar-inner" style="display:block;height:100%;width:100%;background:linear-gradient(90deg,#00ff60,#00cc44);border-radius:4px;transition:width 0.15s,background 0.3s;"></span>
+      </span>
+      <span id="hp-text" style="font-size:11px;font-weight:900;color:#00ff60;">20/20</span>
+    </span>
   </span>
-  <span><small data-i="hud_time">TEMPO</small><b id="hud-time">0:00</b></span>
-  <span><small data-i="hud_score">PUNTI</small><b id="hud-score">0</b></span>
   <span id="boost-hud-slot"><small data-i="hud_boost">BOOST</small>
     <span id="boost-bar-wrap" style="display:flex;align-items:center;height:20px;gap:3px;">
       <span id="boost-bar" style="display:block;width:52px;height:6px;border-radius:3px;background:linear-gradient(90deg,#ffe040,#ff9000);border:1px solid rgba(255,220,0,0.4);transition:width 0.05s;"></span>
@@ -499,8 +513,19 @@
       <span id="ammo-bar" style="display:block;width:52px;height:6px;border-radius:3px;background:linear-gradient(90deg,#00f5ff,#0060ff);border:1px solid rgba(0,200,255,0.4);transition:width 0.05s;"></span>
     </span>
   </span>
-  <span><small data-i="hud_record">RECORD</small><b id="hud-best">0</b></span>
 </div>
+
+<!-- Score + record top-right corner -->
+<div id="score-corner" style="display:none;position:fixed;top:14px;right:22px;text-align:right;z-index:20;pointer-events:none;font-family:'Orbitron',sans-serif;">
+  <div id="hud-score" style="font-size:22px;font-weight:900;color:var(--gold);text-shadow:0 0 10px rgba(255,215,0,0.5);letter-spacing:0.05em;">0</div>
+  <div style="font-size:9px;letter-spacing:0.25em;color:rgba(200,232,248,0.35);">RECORD: <span id="hud-best">0</span></div>
+</div>
+
+<!-- Active power-ups sidebar -->
+<div id="powerup-sidebar" style="position:fixed;top:80px;right:18px;display:none;flex-direction:column;gap:8px;z-index:20;pointer-events:none;"></div>
+
+<!-- Timer bottom right — same right edge as score -->
+<div id="hud-timer-corner" style="display:none;position:fixed;bottom:18px;right:22px;text-align:right;font-family:'Share Tech Mono',monospace;font-size:13px;color:rgba(200,232,248,0.45);letter-spacing:0.12em;z-index:20;pointer-events:none;"></div>
 
 <!-- START SCREEN -->
 <div class="screen" id="screen-start">
@@ -524,19 +549,21 @@
     <div id="modal-skins" class="hidden">
       <div class="modal-title" data-i="modal_skins_title">SCEGLI LA TUA NAVE</div>
       <div class="skin-grid" id="skin-grid"></div>
+      <div id="ship-detail"></div>
     </div>
 
-    <!-- Instructions panel -->
+  <!-- Instructions panel -->
     <div id="modal-instructions" class="hidden">
       <div class="modal-title" id="instr-modal-title" data-i="modal_instr_title">ISTRUZIONI</div>
 
       <!-- Tab switcher -->
-      <div style="display:flex;gap:10px;margin-bottom:16px;">
-        <button class="side-btn" id="tab-controls-btn" onclick="showInstrTab('controls')" style="flex:1;padding:8px;" data-i="tab_controls">🎮 CONTROLLI</button>
-        <button class="side-btn" id="tab-score-btn" onclick="showInstrTab('score')" style="flex:1;padding:8px;" data-i="tab_score">⭐ PUNTEGGIO</button>
+      <div style="display:flex;gap:8px;margin-bottom:16px;">
+        <button class="side-btn" id="tab-controls-btn" onclick="showInstrTab('controls')" style="flex:1;padding:7px;" data-i="tab_controls">🎮 CONTROLLI</button>
+        <button class="side-btn" id="tab-score-btn"    onclick="showInstrTab('score')"    style="flex:1;padding:7px;" data-i="tab_score">⭐ PUNTEGGIO</button>
+        <button class="side-btn" id="tab-guide-btn"    onclick="showInstrTab('guide')"    style="flex:1;padding:7px;" data-i="tab_guide">🌌 UNIVERSO</button>
       </div>
 
-      <!-- Controls tab -->
+      <!-- Controls tab — only input commands -->
       <div id="tab-controls">
         <div class="instr-row">
           <span class="instr-key">↑ ↓ ← →<br>W A S D</span>
@@ -551,12 +578,8 @@
           <span class="instr-desc" data-i="instr_fire">Spara nella direzione in cui punta la navicella</span>
         </div>
         <div class="instr-row">
-          <span class="instr-key" style="background:rgba(255,60,0,0.2);color:#ff6040;border:1px solid rgba(255,60,0,0.4);">⚠ ROSSE</span>
-          <span class="instr-desc" data-i="instr_red">Le meteore rosse sono molto più veloci — massima attenzione</span>
-        </div>
-        <div class="instr-row">
-          <span class="instr-key" style="background:rgba(0,20,40,0.6);color:#80e0ff;border:1px solid rgba(100,200,255,0.3);">🌀 B.NERI</span>
-          <span class="instr-desc" data-i="instr_bh">I buchi neri attirano la navicella — aumentano man mano che ti avvicini</span>
+          <span class="instr-key" style="background:rgba(0,245,255,0.1);color:var(--cyan);border:1px solid var(--border);">BORDI</span>
+          <span class="instr-desc" data-i="instr_wrap">Il mondo è infinito — uscire da un lato fa rientrare dall'altro</span>
         </div>
       </div>
 
@@ -570,6 +593,21 @@
           <tr><td data-i="sc_void">🌑 Meteora nel secondo mondo</td><td>+10 pt</td></tr>
           <tr><td data-i="sc_alien">👾 Navicella aliena (Scout/Caotico/Bomber)</td><td>+20 pt</td></tr>
           <tr><td data-i="sc_dread">🛡 Dreadnought alieno (5 HP)</td><td>+50 pt</td></tr>
+        </table>
+      </div>
+
+      <!-- Universe / Encyclopedia tab -->
+      <div id="tab-guide" class="hidden">
+        <table class="score-table">
+          <tr><td data-i="gu_meteor">🪨 Meteora normale</td><td data-i="gu_meteor_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Ostacolo base. Distruggerla o evitarla.</td></tr>
+          <tr><td data-i="gu_fast">🔴 Meteora rossa</td><td data-i="gu_fast_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Molto più veloce. Attenzione!.</td></tr>
+          <tr><td data-i="gu_crystal">💎 Meteora cristallo</td><td data-i="gu_crystal_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Colpendola si frammenta in 3 schegge più veloci.</td></tr>
+          <tr><td data-i="gu_bh">🌀 Buco nero</td><td data-i="gu_bh_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Attrae la navicella. Avvicinandosi la forza aumenta. Attraversarlo porta nel Secondo Mondo.</td></tr>
+          <tr><td data-i="gu_scout">👾 Alieno Scout</td><td data-i="gu_scout_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Verde. Spara colpi mirati. Lascia +10 HP.</td></tr>
+          <tr><td data-i="gu_chaotic">💢 Alieno Caotico</td><td data-i="gu_chaotic_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Rosso. Salve di colpi random. Lascia fuoco rapido.</td></tr>
+          <tr><td data-i="gu_bomber">🟣 Alieno Bombardiere</td><td data-i="gu_bomber_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Viola. Lancia meteore speciali. Lascia scudo 30s.</td></tr>
+          <tr><td data-i="gu_dread">🟡 Dreadnought</td><td data-i="gu_dread_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Oro. Resistente, 5 HP. Lascia la ⭐ Star Power 45s + abilità nave.</td></tr>
+          <tr><td data-i="gu_void">🌑 Secondo Mondo</td><td data-i="gu_void_d" style="text-align:left;font-size:11px;color:rgba(200,232,248,0.65);">Dentro il buco nero. Tempo +50%, meteore nere, torrette nemiche. Portale dopo 30s.</td></tr>
         </table>
       </div>
     </div>
@@ -659,6 +697,7 @@ let voidSpawnTimer = 0;
 let voidPortalAngle = 0;
 let voidStars = [];
 let voidTransition = { active: false, t: 0, duration: 2.8 };
+let voidExitTransition = { active: false, t: 0, duration: 2.6 };
 let voidWorldObjects = [];
 let voidTurrets = [];       // stationary shooters in void world
 let voidTurretBullets = []; // bullets from void turrets
@@ -681,19 +720,22 @@ function wrapAdjust(wx, wy) {
 
 // ─── SKIN DEFINITIONS ────────────────────────────────────────────
 const SKINS = [
-  { id:0, name:'VIPER',    desc:'Bilanciata · fuoco standard',      accent:'#00f5ff', dark:'#031b2a' },
-  { id:1, name:'SCORPION', desc:'Veloce · proiettili pesanti lenti', accent:'#ff5520', dark:'#2a0a03' },
-  { id:2, name:'PHANTOM',  desc:'Lenta · fuoco rapido perforante',   accent:'#c060ff', dark:'#1a0530' },
-  { id:3, name:'TITAN',    desc:'Lentissima · raggio divisore',      accent:'#ffd700', dark:'#2a1e00' },
+  { id:0, name:'VIPER',    desc:'Bilanciata · fuoco standard',      accent:'#00f5ff', dark:'#031b2a',
+    ability:'DOPPIO RAGGIO', abilityDesc:'Spara due proiettili contemporaneamente in direzioni leggermente diverse, coprendo un arco più ampio.' },
+  { id:1, name:'SCORPION', desc:'Veloce · proiettili pesanti lenti', accent:'#ff5520', dark:'#2a0a03',
+    ability:'RAFFICA PESANTE', abilityDesc:'Esplode una raffica di 5 bolt pesanti che perforano più meteoriti e causano esplosioni a catena.' },
+  { id:2, name:'PHANTOM',  desc:'Lenta · fuoco rapido perforante',   accent:'#c060ff', dark:'#1a0530',
+    ability:'INVISIBILITÀ', abilityDesc:'La navicella diventa semi-invisibile per 8 secondi: i meteoriti la attraversano senza danneggiarla.' },
+  { id:3, name:'TITAN',    desc:'Potente · raggio divisore devastante', accent:'#ffd700', dark:'#2a1e00',
+    ability:'SUPERNOVA', abilityDesc:'Lancia un\'onda d\'urto circolare che distrugge tutti i meteoriti nel raggio di 400px. Effetto devastante.' },
 ];
 let selectedSkin = parseInt(localStorage.getItem('vr_skin') || '0');
 
-// ─── SHIP STATS ──────────────────────────────────────────────────
 const SHIP_STATS = [
-  { speed: 345, maxSpeed: 442, cooldown: 0.18, bulletSpeed: 910,  bulletType: 'normal' }, // VIPER
-  { speed: 403, maxSpeed: 520, cooldown: 0.26, bulletSpeed: 728,  bulletType: 'heavy'  }, // SCORPION
-  { speed: 254, maxSpeed: 351, cooldown: 0.09, bulletSpeed:1248,  bulletType: 'rapid'  }, // PHANTOM
-  { speed: 215, maxSpeed: 286, cooldown: 0.50, bulletSpeed: 624,  bulletType: 'beam'   }, // TITAN
+  { speed: 345, maxSpeed: 442, cooldown: 0.18, bulletSpeed: 910,  bulletSize: 'M', bulletType: 'normal' }, // VIPER
+  { speed: 403, maxSpeed: 520, cooldown: 0.26, bulletSpeed: 728,  bulletSize: 'L', bulletType: 'heavy'  }, // SCORPION
+  { speed: 254, maxSpeed: 351, cooldown: 0.09, bulletSpeed:1248,  bulletSize: 'S', bulletType: 'rapid'  }, // PHANTOM
+  { speed: 215, maxSpeed: 310, cooldown: 0.38, bulletSpeed: 820,  bulletSize: 'XL',bulletType: 'beam'   }, // TITAN (faster cooldown, bigger bullets)
 ];
 
 // ─── SPACE OBJECTS (planets, moons, galaxies) ────────────────────
@@ -707,145 +749,131 @@ function initWorld() {
     [255,120,60],[80,200,150],[200,140,255],[255,180,80],[60,200,220],
   ];
 
-  // ── Galaxies (40) ──
-  for (let i = 0; i < 40; i++) {
-    spaceObjects.push({
-      type: 'galaxy',
-      wx: Math.random() * WORLD_W, wy: Math.random() * WORLD_H,
-      rx: 380 + Math.random()*320, ry: 120 + Math.random()*140,
-      angle: Math.random() * Math.PI,
-      color: [
-        Math.floor(150+Math.random()*105),
-        Math.floor(150+Math.random()*105),
-        Math.floor(150+Math.random()*105),
-      ],
-    });
+  // Grid-based placement: divides world into cells, one object per cell with jitter.
+  // Guarantees even distribution; minDist prevents adjacent objects of same type.
+  function gridPlace(count, minDist, fn) {
+    const cols = Math.ceil(Math.sqrt(count * 1.8));
+    const rows = Math.ceil(count / cols * 1.8);
+    const cellW = WORLD_W / cols, cellH = WORLD_H / rows;
+    const cells = [];
+    for (let r=0;r<rows;r++) for (let c=0;c<cols;c++) cells.push([c,r]);
+    for (let i=cells.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[cells[i],cells[j]]=[cells[j],cells[i]];}
+    const placed = [];
+    for (const [c,r] of cells) {
+      if (placed.length >= count) break;
+      const wx = (c + 0.15 + Math.random()*0.70) * cellW;
+      const wy = (r + 0.15 + Math.random()*0.70) * cellH;
+      if (placed.some(p => Math.hypot(wx-p[0],wy-p[1]) < minDist)) continue;
+      placed.push([wx,wy]);
+      fn(wx, wy);
+    }
   }
 
-  // ── Nebula patches (35) — large and vivid ──
-  for (let i = 0; i < 35; i++) {
-    const hue = Math.random();
-    let r=10,g=10,b=80;
-    if (hue < 0.25)      { r=80;g=0;b=120; }
-    else if (hue < 0.5)  { r=0;g=60;b=120; }
-    else if (hue < 0.75) { r=120;g=0;b=60; }
-    else                 { r=0;g=100;b=60; }
-    spaceObjects.push({
-      type:'nebula',
-      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 1800 + Math.random()*2200,   // much bigger — always visible from distance
-      color:[r, g, b, 0.09 + Math.random()*0.07],
-    });
-  }
+  // Nebulae (16) — min 2800px apart
+  gridPlace(16, 2800, (wx,wy) => {
+    const hue=Math.random(); let r=10,g=10,b=80;
+    if(hue<0.25){r=80;g=0;b=120;}else if(hue<0.5){r=0;g=60;b=120;}
+    else if(hue<0.75){r=120;g=0;b=60;}else{r=0;g=100;b=60;}
+    spaceObjects.push({type:'nebula',wx,wy,r:1600+Math.random()*1800,color:[r,g,b,0.08+Math.random()*0.06]});
+  });
 
-  // ── Star clusters (22) ──
-  for (let i = 0; i < 22; i++) {
-    const obj = {
-      type:'cluster',
-      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 200 + Math.random()*280,
-      count: 80 + Math.floor(Math.random()*100),
-      stars: null,
-    };
-    obj.stars = Array.from({length: obj.count}, () => ({
-      dx: (Math.random()-0.5)*2*obj.r,
-      dy: (Math.random()-0.5)*2*obj.r,
-      r:  Math.random()*2.0+0.4,
-      alpha: Math.random()*0.7+0.3,
-    })).filter(s => Math.sqrt(s.dx*s.dx+s.dy*s.dy) < obj.r);
+  // Dust clouds (20) — min 1800px apart
+  gridPlace(20, 1800, (wx,wy) => {
+    spaceObjects.push({type:'dust',wx,wy,r:700+Math.random()*1100,color:[
+      Math.floor(Math.random()*80+15),Math.floor(Math.random()*60+10),Math.floor(Math.random()*120+50)
+    ]});
+  });
+
+  // Galaxies (18) — min 2200px apart
+  gridPlace(18, 2200, (wx,wy) => {
+    spaceObjects.push({type:'galaxy',wx,wy,
+      rx:280+Math.random()*260,ry:90+Math.random()*110,
+      angle:Math.random()*Math.PI,
+      color:[Math.floor(150+Math.random()*105),Math.floor(150+Math.random()*105),Math.floor(150+Math.random()*105)]
+    });
+  });
+
+  // Star clusters (12) — min 2400px apart
+  gridPlace(12, 2400, (wx,wy) => {
+    const obj={type:'cluster',wx,wy,r:160+Math.random()*200,count:65+Math.floor(Math.random()*70),stars:null};
+    obj.stars=Array.from({length:obj.count},()=>({
+      dx:(Math.random()-0.5)*2*obj.r,dy:(Math.random()-0.5)*2*obj.r,
+      r:Math.random()*2.0+0.4,alpha:Math.random()*0.7+0.3,
+    })).filter(s=>Math.sqrt(s.dx*s.dx+s.dy*s.dy)<obj.r);
     spaceObjects.push(obj);
-  }
+  });
 
-  // ── Asteroid belts (16) ──
-  for (let i = 0; i < 16; i++) {
-    spaceObjects.push({
-      type: 'belt',
-      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      rx: 350 + Math.random()*500, ry: 90 + Math.random()*140,
-      angle: Math.random()*Math.PI,
-      count: 80 + Math.floor(Math.random()*100),
-      seeds: Array.from({length:180}, () => ({
-        t: Math.random(),
-        r: Math.random()*5+1,
-        alpha: Math.random()*0.55+0.18,
-        spread: (Math.random()-0.5)*35,
-      })),
+  // Supernovas (10) — min 2800px apart
+  const snovaCols=[[255,100,30],[255,200,80],[80,200,255],[255,60,180],[120,255,180],[255,255,100],[200,100,255]];
+  let si=0;
+  gridPlace(10, 2800, (wx,wy) => {
+    spaceObjects.push({type:'supernova',wx,wy,r:200+Math.random()*280,
+      color:snovaCols[(si++)%snovaCols.length],phase:Math.random()*Math.PI*2});
+  });
+
+  // Pulsars (10) — min 2800px apart
+  gridPlace(10, 2800, (wx,wy) => {
+    spaceObjects.push({type:'pulsar',wx,wy,
+      r:12+Math.random()*12,beamAngle:Math.random()*Math.PI*2,beamSpeed:1.5+Math.random()*2.5,
+      color:[Math.floor(Math.random()*255),Math.floor(Math.random()*200+55),255]
     });
-  }
+  });
 
-  // ── Pulsars (14) ──
-  for (let i = 0; i < 14; i++) {
-    spaceObjects.push({
-      type: 'pulsar',
-      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 14 + Math.random()*14,
-      beamAngle: Math.random()*Math.PI*2,
-      beamSpeed: 1.5 + Math.random()*2.5,
-      color: [
-        Math.floor(Math.random()*255),
-        Math.floor(Math.random()*200+55),
-        255,
-      ],
+  // Asteroid belts (10) — min 2500px apart
+  gridPlace(10, 2500, (wx,wy) => {
+    spaceObjects.push({type:'belt',wx,wy,
+      rx:300+Math.random()*420,ry:75+Math.random()*110,angle:Math.random()*Math.PI,
+      count:65+Math.floor(Math.random()*75),
+      seeds:Array.from({length:150},()=>({
+        t:Math.random(),r:Math.random()*4+1,alpha:Math.random()*0.5+0.15,spread:(Math.random()-0.5)*28,
+      }))
     });
-  }
+  });
 
-  // ── Supernovas / space anomalies (20) ──
-  const snovaCols = [[255,100,30],[255,200,80],[80,200,255],[255,60,180],[120,255,180],[255,255,100],[200,100,255]];
-  for (let i = 0; i < 20; i++) {
-    spaceObjects.push({
-      type: 'supernova',
-      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 250 + Math.random()*380,     // bigger
-      color: snovaCols[i % snovaCols.length],
-      phase: Math.random()*Math.PI*2,
-    });
-  }
-
-  // ── Space dust clouds (40) — very large, set the mood ──
-  for (let i = 0; i < 40; i++) {
-    spaceObjects.push({
-      type: 'dust',
-      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 900 + Math.random()*1400,
-      color: [
-        Math.floor(Math.random()*80+20),
-        Math.floor(Math.random()*80+20),
-        Math.floor(Math.random()*120+60),
-      ],
-    });
-  }
-
-  // ── Black holes (20) ──
+  // Black holes (14) — min 2000px apart
   blackHoles = [];
-  for (let i = 0; i < 20; i++) {
-    const bh = {
-      type:'blackhole',
-      wx: Math.random()*WORLD_W, wy: Math.random()*WORLD_H,
-      r: 55 + Math.random()*55,
-      diskAngle: Math.random()*Math.PI*2,
-    };
-    spaceObjects.push(bh);
-    blackHoles.push(bh);
+  let bhTries=0;
+  while(blackHoles.length<14 && bhTries<600){
+    bhTries++;
+    const bx=800+Math.random()*(WORLD_W-1600), by=800+Math.random()*(WORLD_H-1600);
+    if(blackHoles.some(e=>Math.hypot(bx-e.wx,by-e.wy)<2000)) continue;
+    const bh={type:'blackhole',wx:bx,wy:by,r:55+Math.random()*55,diskAngle:Math.random()*Math.PI*2};
+    spaceObjects.push(bh); blackHoles.push(bh);
   }
 
-  // ── Planets (220) — large, spread evenly ──
-  const cx = WORLD_W/2, cy = WORLD_H/2;
-  let placed = 0;
-  while (placed < 220) {
-    const wx = Math.random()*WORLD_W, wy = Math.random()*WORLD_H;
-    const r = 70 + Math.random()*140;   // bigger: 70–210
-    const color = PLANET_COLORS[Math.floor(Math.random()*PLANET_COLORS.length)];
-    const rings = Math.random() < 0.38;
-    const moonCount = Math.floor(Math.random()*3);
-    const moons = Array.from({length: moonCount}, () => ({
-      r: 7 + Math.floor(Math.random()*16),
-      orbit: r*(1.4 + Math.random()*0.9),
-      angle: Math.random()*Math.PI*2,
-      speed: 0.08 + Math.random()*0.40,
+  // Planets (100) — min 900px apart; allows occasional close pairs but never clusters
+  gridPlace(100, 900, (wx,wy) => {
+    const r=55+Math.random()*110;
+    const color=PLANET_COLORS[Math.floor(Math.random()*PLANET_COLORS.length)];
+    const rings=Math.random()<0.30;
+    const moonCount=Math.floor(Math.random()*3);
+    const moons=Array.from({length:moonCount},()=>({
+      r:6+Math.floor(Math.random()*13),orbit:r*(1.3+Math.random()*0.8),
+      angle:Math.random()*Math.PI*2,speed:0.08+Math.random()*0.38,
     }));
-    spaceObjects.push({ type:'planet', wx, wy, r, color, rings, moons });
-    placed++;
-  }
+    spaceObjects.push({type:'planet',wx,wy,r,color,rings,moons});
+  });
+
+  // Constellations — random per game, min 2000px apart
+  const CONSTELLATION_DEFS = [
+    { scale:380, stars:[[-0.882,0.206],[-0.445,0.027],[0.024,-0.063],[-0.163,0.049],[0.113,0.013],[0.353,-0.022],[1.000,-0.209]], edges:[[0,1],[1,2],[2,3],[3,0],[3,4],[4,5],[5,6]] },
+    { scale:300, stars:[[0.529,0.988],[-0.317,0.865],[-0.059,0.091],[0.062,-0.014],[0.191,-0.100],[0.255,-1.000],[-0.661,-0.829]], edges:[[0,1],[0,2],[1,3],[2,3],[3,4],[4,5],[4,6],[5,6]] },
+    { scale:240, stars:[[-0.292,-0.566],[-1.000,-0.146],[-0.075,0.105],[0.521,0.028],[0.847,0.579]], edges:[[0,1],[0,2],[2,3],[3,4]] },
+    { scale:320, stars:[[-0.130,-0.324],[1.000,-0.195],[-0.278,0.066],[0.319,0.100],[0.550,-0.152],[-0.862,0.261],[-0.599,0.244]], edges:[[0,2],[2,6],[6,5],[5,2],[0,1],[1,3],[3,4],[4,0]] },
+    { scale:280, stars:[[0.407,0.233],[0.412,0.423],[0.412,0.423],[0.095,0.248],[0.394,0.274],[-1.000,-0.595],[-0.349,-0.396],[-0.163,-0.300],[-0.208,-0.310]], edges:[[1,2],[2,3],[3,0],[0,4],[4,1],[0,5],[5,6],[6,7],[7,8]] },
+    { scale:260, stars:[[-0.646,0.255],[-0.087,0.066],[0.869,-0.399],[0.864,-0.172],[-1.000,0.250]], edges:[[0,1],[1,2],[1,3],[1,4]] },
+  ];
+  const placedConst = [];
+  CONSTELLATION_DEFS.forEach((def) => {
+    let wx, wy, tries=0;
+    do {
+      wx = 1500 + Math.random()*(WORLD_W-3000);
+      wy = 1500 + Math.random()*(WORLD_H-3000);
+      tries++;
+    } while(tries<200 && placedConst.some(p=>Math.hypot(wx-p[0],wy-p[1])<2000));
+    placedConst.push([wx,wy]);
+    spaceObjects.push({type:'constellation',wx,wy,def,angle:Math.random()*Math.PI*2});
+  });
 }
 
 function drawSpaceObjects() {
@@ -854,16 +882,65 @@ function drawSpaceObjects() {
     // Cull objects far outside viewport
     const sx = wx - camera.x + W/2, sy = wy - camera.y + H/2;
     const cullR = obj.type === 'blackhole'
-      ? (obj.r || 80) * 20
-      : obj.type === 'nebula' || obj.type === 'dust'
-        ? (obj.r || 500)         // nebulae are huge, always draw
-        : (obj.r || obj.rx || 250) * 4; // 4× buffer for planets/galaxies
+      ? (obj.r || 80) * 22
+      : obj.type === 'constellation'
+        ? 1800   // large cull radius so constellations are visible when approaching
+        : obj.type === 'nebula' || obj.type === 'dust'
+          ? (obj.r || 500)
+          : (obj.r || obj.rx || 250) * 4;
     if (sx < -cullR || sx > W+cullR || sy < -cullR || sy > H+cullR) return;
 
     ctx.save();
     ctx.translate(wx, wy);
 
-    if (obj.type === 'dust') {
+    if (obj.type === 'constellation') {
+      const def = obj.def;
+      const sc = def.scale;
+      // Center the definition coords
+      const cx = def.stars.reduce((s,[x])=>s+x,0)/def.stars.length;
+      const cy = def.stars.reduce((s,[,y])=>s+y,0)/def.stars.length;
+      const pts = def.stars.map(([x,y]) => {
+        const rx = (x-cx)*sc, ry = (y-cy)*sc;
+        // Rotate slightly
+        return [
+          rx*Math.cos(obj.angle) - ry*Math.sin(obj.angle),
+          rx*Math.sin(obj.angle) + ry*Math.cos(obj.angle)
+        ];
+      });
+
+      // Draw connection lines
+      ctx.save();
+      def.edges.forEach(([a,b]) => {
+        ctx.beginPath();
+        ctx.moveTo(pts[a][0], pts[a][1]);
+        ctx.lineTo(pts[b][0], pts[b][1]);
+        ctx.strokeStyle='rgba(80,150,255,0.35)';
+        ctx.lineWidth=1.5;
+        ctx.stroke();
+      });
+
+      // Draw stars
+      pts.forEach((pt, i) => {
+        const isMain = i < 2;
+        const r = isMain ? 3.5 : 2.5;
+        const g=ctx.createRadialGradient(pt[0],pt[1],0,pt[0],pt[1],r*5);
+        g.addColorStop(0,'rgba(140,200,255,0.55)'); g.addColorStop(1,'rgba(40,80,200,0)');
+        ctx.beginPath(); ctx.arc(pt[0],pt[1],r*5,0,Math.PI*2); ctx.fillStyle=g; ctx.fill();
+        ctx.beginPath(); ctx.arc(pt[0],pt[1],r,0,Math.PI*2);
+        ctx.fillStyle=isMain?'rgba(200,235,255,0.95)':'rgba(160,210,255,0.85)';
+        ctx.fill();
+        // Cross flare on main stars
+        if (isMain) {
+          const fl = r*4;
+          ctx.strokeStyle='rgba(160,210,255,0.25)'; ctx.lineWidth=0.7;
+          ctx.beginPath(); ctx.moveTo(pt[0]-fl,pt[1]); ctx.lineTo(pt[0]+fl,pt[1]); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(pt[0],pt[1]-fl); ctx.lineTo(pt[0],pt[1]+fl); ctx.stroke();
+        }
+      });
+
+      ctx.restore();
+
+    } else if (obj.type === 'dust') {
       const [r,g,b] = obj.color;
       const grd = ctx.createRadialGradient(0,0,0,0,0,obj.r);
       grd.addColorStop(0,  `rgba(${r},${g},${b},0.07)`);
@@ -959,45 +1036,98 @@ function drawSpaceObjects() {
       ctx.beginPath(); ctx.arc(0,0,obj.r*0.4,0,Math.PI*2); ctx.fillStyle=cg; ctx.fill();
 
     } else if (obj.type === 'blackhole') {
-      obj.diskAngle = (obj.diskAngle || 0) + 0.012;
+      obj.diskAngle = (obj.diskAngle || 0) + 0.014;
+      if (!obj.jetAngle) obj.jetAngle = Math.random()*Math.PI*2;
       const bhR = obj.r;
-      // Increase cull radius so far glow is drawn when approaching
-      const farGlowR = bhR * 18;
+      const t = obj.diskAngle;
 
-      // Far gravitational lens glow — visible from VERY far away
-      const lens = ctx.createRadialGradient(0,0,bhR*2,0,0,farGlowR);
-      lens.addColorStop(0,  'rgba(100,50,200,0.22)');
-      lens.addColorStop(0.3,'rgba(60,20,140,0.12)');
-      lens.addColorStop(0.7,'rgba(30,10,80,0.06)');
+      // ── 1. Vast gravitational lens field (very large, faint) ──
+      const lensR = bhR * 22;
+      const lens = ctx.createRadialGradient(0,0,bhR*1.5,0,0,lensR);
+      lens.addColorStop(0,  'rgba(80,30,180,0.30)');
+      lens.addColorStop(0.2,'rgba(60,15,140,0.18)');
+      lens.addColorStop(0.5,'rgba(40,10,100,0.08)');
+      lens.addColorStop(0.8,'rgba(20,5,60,0.04)');
       lens.addColorStop(1,  'rgba(0,0,0,0)');
-      ctx.beginPath(); ctx.arc(0,0,farGlowR,0,Math.PI*2);
-      ctx.fillStyle=lens; ctx.fill();
+      ctx.beginPath(); ctx.arc(0,0,lensR,0,Math.PI*2); ctx.fillStyle=lens; ctx.fill();
 
-      // Rotating accretion disk (ellipse rings)
+      // ── 2. Relativistic jets (perpendicular to disk) ──
+      const jetLen = bhR * 10;
+      [0, Math.PI].forEach(offset => {
+        const jx = Math.cos(obj.jetAngle+offset+Math.PI/2);
+        const jy = Math.sin(obj.jetAngle+offset+Math.PI/2);
+        const jg = ctx.createLinearGradient(0,0,jx*jetLen,jy*jetLen);
+        jg.addColorStop(0, 'rgba(140,80,255,0.55)');
+        jg.addColorStop(0.3,'rgba(100,40,200,0.25)');
+        jg.addColorStop(1, 'rgba(60,0,150,0)');
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(-jy*bhR*0.3, jx*bhR*0.3);
+        ctx.lineTo(jx*jetLen, jy*jetLen);
+        ctx.lineTo(jy*bhR*0.3,-jx*bhR*0.3);
+        ctx.closePath();
+        ctx.fillStyle=jg; ctx.fill();
+        ctx.restore();
+      });
+
+      // ── 3. Accretion disk — multi-layer rotating ellipse ──
       ctx.save();
-      ctx.rotate(obj.diskAngle);
-      ctx.scale(1, 0.28);
-      for (let ring = 0; ring < 3; ring++) {
-        const rr = bhR*(1.35+ring*0.38);
-        const alpha = 0.40 - ring*0.10;
-        const col = ring===0 ? `rgba(255,180,30,${alpha})` : ring===1 ? `rgba(255,100,10,${alpha})` : `rgba(180,60,0,${alpha})`;
-        ctx.beginPath(); ctx.arc(0,0,rr,0,Math.PI*2);
-        ctx.lineWidth = bhR*(0.24-ring*0.05);
-        ctx.strokeStyle = col; ctx.stroke();
+      ctx.rotate(t);
+      ctx.scale(1, 0.22);  // flatten to disk
+      // Outer cool dust
+      ctx.beginPath(); ctx.arc(0,0,bhR*2.4,0,Math.PI*2);
+      ctx.lineWidth=bhR*0.18; ctx.strokeStyle=`rgba(120,60,20,0.28)`; ctx.stroke();
+      // Mid warm orange
+      ctx.beginPath(); ctx.arc(0,0,bhR*1.85,0,Math.PI*2);
+      ctx.lineWidth=bhR*0.22; ctx.strokeStyle=`rgba(200,110,20,0.38)`; ctx.stroke();
+      // Inner hot yellow-white
+      ctx.beginPath(); ctx.arc(0,0,bhR*1.45,0,Math.PI*2);
+      ctx.lineWidth=bhR*0.28; ctx.strokeStyle=`rgba(255,200,80,0.48)`; ctx.stroke();
+      // Innermost blinding strip
+      ctx.beginPath(); ctx.arc(0,0,bhR*1.15,0,Math.PI*2);
+      ctx.lineWidth=bhR*0.20; ctx.strokeStyle=`rgba(255,240,200,0.60)`; ctx.stroke();
+      ctx.restore();
+
+      // ── 4. Counter-rotating inner wisps ──
+      ctx.save();
+      ctx.rotate(-t*0.6);
+      ctx.scale(1, 0.35);
+      for (let i=0; i<3; i++) {
+        const a0=i*Math.PI*2/3, a1=a0+0.9;
+        ctx.beginPath();
+        ctx.arc(0,0,bhR*1.3,a0,a1);
+        ctx.lineWidth=bhR*0.12; ctx.strokeStyle=`rgba(255,160,40,0.22)`; ctx.stroke();
       }
       ctx.restore();
 
-      // Dark center
-      ctx.beginPath(); ctx.arc(0,0,bhR,0,Math.PI*2);
-      ctx.fillStyle='rgba(0,0,0,0.98)'; ctx.fill();
+      // ── 5. Gravitational lensing ring (photon sphere) ──
+      const lensRing = ctx.createRadialGradient(0,0,bhR*1.0,0,0,bhR*1.5);
+      lensRing.addColorStop(0,'rgba(255,220,100,0.20)');
+      lensRing.addColorStop(0.5,'rgba(200,150,50,0.12)');
+      lensRing.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,bhR*1.5,0,Math.PI*2);
+      ctx.fillStyle=lensRing; ctx.fill();
 
-      // Event horizon purple rim
-      const rim = ctx.createRadialGradient(0,0,bhR*0.7,0,0,bhR*1.2);
-      rim.addColorStop(0,'rgba(0,0,0,0)');
-      rim.addColorStop(0.7,'rgba(120,40,255,0.35)');
-      rim.addColorStop(1,'rgba(0,0,0,0)');
-      ctx.beginPath(); ctx.arc(0,0,bhR*1.2,0,Math.PI*2);
-      ctx.fillStyle=rim; ctx.fill();
+      // ── 6. Event horizon — pure black ──
+      ctx.beginPath(); ctx.arc(0,0,bhR,0,Math.PI*2);
+      ctx.fillStyle='#000000'; ctx.fill();
+
+      // ── 7. Event horizon rim — thin blue-white glow (gravitational blueshift) ──
+      const blueshift = ctx.createRadialGradient(0,0,bhR*0.85,0,0,bhR*1.1);
+      blueshift.addColorStop(0,'rgba(0,0,0,0)');
+      blueshift.addColorStop(0.6,'rgba(160,210,255,0.40)');
+      blueshift.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,bhR*1.1,0,Math.PI*2);
+      ctx.fillStyle=blueshift; ctx.fill();
+
+      // ── 8. Particle infall streaks ──
+      for (let i=0; i<8; i++) {
+        const sa = t*2.3 + i*Math.PI*2/8;
+        const dist = bhR*(1.6 + Math.sin(t*1.7+i)*0.3);
+        const px=Math.cos(sa)*dist, py=Math.sin(sa)*dist*0.25;
+        ctx.beginPath(); ctx.arc(px,py,1.5,0,Math.PI*2);
+        ctx.fillStyle=`rgba(255,200,80,0.6)`; ctx.fill();
+      }
 
     } else if (obj.type === 'galaxy') {
       const [gr,gg,gb] = obj.color;
@@ -1082,17 +1212,26 @@ const STRINGS = {
     modal_instr_title:'ISTRUZIONI',
     modal_controls_title:'CONTROLLI',
     modal_score_title:'PUNTEGGIO',
-    tab_controls:'🎮 CONTROLLI', tab_score:'⭐ PUNTEGGIO',
+    modal_guide_title:'UNIVERSO',
+    tab_controls:'🎮 CONTROLLI', tab_score:'⭐ PUNTEGGIO', tab_guide:'🌌 UNIVERSO',
     instr_move:'Muovi la navicella nello spazio',
     instr_boost:'Boost — accelerazione rapida (la barra gialla si svuota e si ricarica)',
     instr_fire:'Spara nella direzione in cui punta la navicella',
-    instr_red:'Le meteore rosse sono molto più veloci — massima attenzione',
-    instr_bh:'I buchi neri attirano la navicella — aumentano man mano che ti avvicini',
+    instr_wrap:'Il mondo è infinito — uscire da un lato fa rientrare dall\'altro',
     sc_time:'⏱ Ogni secondo sopravvissuto',
     sc_normal:'🪨 Meteora normale colpita',
     sc_fast:'🔴 Meteora rossa (veloce)',
     sc_crystal:'💎 Meteora cristallo (+ frammenti)',
     sc_void:'🌑 Meteora nel secondo mondo',
+    gu_meteor:'🪨 Meteora normale', gu_meteor_d:'Ostacolo base. Distruggerla o evitarla.',
+    gu_fast:'🔴 Meteora rossa', gu_fast_d:'Molto più veloce. Attenzione!',
+    gu_crystal:'💎 Meteora cristallo', gu_crystal_d:'Colpendola si frammenta in 3 schegge più veloci.',
+    gu_bh:'🌀 Buco nero', gu_bh_d:'Attrae la navicella. Avvicinandosi la forza aumenta. Attraversarlo porta nel Secondo Mondo.',
+    gu_scout:'👾 Alieno Scout', gu_scout_d:'Verde. Spara colpi mirati. Lascia +10 HP.',
+    gu_chaotic:'💢 Alieno Caotico', gu_chaotic_d:'Rosso. Salve di colpi random. Lascia fuoco rapido.',
+    gu_bomber:'🟣 Alieno Bombardiere', gu_bomber_d:'Viola. Lancia meteore speciali. Lascia scudo 30s.',
+    gu_dread:'🟡 Dreadnought', gu_dread_d:'Oro. Resistente, 5 HP. Lascia la ⭐ Star Power 45s + abilità nave.',
+    gu_void:'🌑 Secondo Mondo', gu_void_d:'Dentro il buco nero. Tempo +50%, meteore nere, torrette nemiche. Portale dopo 30s.',
     sc_alien:'👾 Navicella aliena (Scout/Caotico/Bomber)',
     sc_dread:'🛡 Dreadnought alieno (5 HP)',
     record_badge:'★ NUOVO RECORD PERSONALE!',
@@ -1116,17 +1255,26 @@ const STRINGS = {
     modal_instr_title:'INSTRUCTIONS',
     modal_controls_title:'CONTROLS',
     modal_score_title:'SCORING',
-    tab_controls:'🎮 CONTROLS', tab_score:'⭐ SCORING',
+    modal_guide_title:'THE UNIVERSE',
+    tab_controls:'🎮 CONTROLS', tab_score:'⭐ SCORING', tab_guide:'🌌 UNIVERSE',
     instr_move:'Move the ship through space',
     instr_boost:'Boost — quick acceleration (yellow bar drains and recharges)',
     instr_fire:'Fire in the direction the ship is facing',
-    instr_red:'Red meteors are much faster — maximum caution',
-    instr_bh:'Black holes pull the ship — gravity increases as you get closer',
+    instr_wrap:'The world is infinite — leaving one side brings you back from the other',
     sc_time:'⏱ Each second survived',
     sc_normal:'🪨 Normal meteor hit',
     sc_fast:'🔴 Red meteor (fast)',
     sc_crystal:'💎 Crystal meteor (+ fragments)',
     sc_void:'🌑 Meteor in the void world',
+    gu_meteor:'🪨 Normal meteor', gu_meteor_d:'Basic obstacle. Destroy or dodge it.',
+    gu_fast:'🔴 Red meteor', gu_fast_d:'Much faster. Watch out!',
+    gu_crystal:'💎 Crystal meteor', gu_crystal_d:'Shatters into 3 faster fragments on hit.',
+    gu_bh:'🌀 Black hole', gu_bh_d:'Pulls the ship — gravity grows closer. Entering it leads to the Second World.',
+    gu_scout:'👾 Scout alien', gu_scout_d:'Green. Fires aimed shots. Drops +10 HP.',
+    gu_chaotic:'💢 Chaotic alien', gu_chaotic_d:'Red. Random burst fire. Drops rapid fire.',
+    gu_bomber:'🟣 Bomber alien', gu_bomber_d:'Purple. Launches special meteors. Drops 30s shield.',
+    gu_dread:'🟡 Dreadnought', gu_dread_d:'Gold. Tough, 5 HP. Drops ⭐ Star Power 45s + ship ability.',
+    gu_void:'🌑 Second World', gu_void_d:'Inside the black hole. Time +50%, black meteors, enemy turrets. Portal after 30s.',
     sc_alien:'👾 Alien ship (Scout/Chaotic/Bomber)',
     sc_dread:'🛡 Alien Dreadnought (5 HP)',
     record_badge:'★ NEW PERSONAL RECORD!',
@@ -1175,20 +1323,44 @@ function toggleLang() {
 function showInstrTab(tab) {
   document.getElementById('tab-controls').classList.toggle('hidden', tab !== 'controls');
   document.getElementById('tab-score').classList.toggle('hidden', tab !== 'score');
+  document.getElementById('tab-guide').classList.toggle('hidden', tab !== 'guide');
   document.getElementById('tab-controls-btn').style.borderColor = tab==='controls' ? 'var(--cyan)' : '';
-  document.getElementById('tab-score-btn').style.borderColor = tab==='score' ? 'var(--cyan)' : '';
+  document.getElementById('tab-score-btn').style.borderColor    = tab==='score'    ? 'var(--cyan)' : '';
+  document.getElementById('tab-guide-btn').style.borderColor    = tab==='guide'    ? 'var(--cyan)' : '';
   const s = STRINGS[currentLang];
   const titleEl = document.getElementById('instr-modal-title');
-  if (titleEl) titleEl.textContent = tab === 'controls' ? s.modal_controls_title : s.modal_score_title;
+  if (titleEl) titleEl.textContent =
+    tab === 'controls' ? s.modal_controls_title :
+    tab === 'score'    ? s.modal_score_title :
+                         s.modal_guide_title;
 }
 
 // ─── LOCALSTORAGE ────────────────────────────────────────────────
 function getScores() {
-  try { return JSON.parse(localStorage.getItem('vr_scores') || '[]'); }
-  catch { return []; }
+  try {
+    const raw = JSON.parse(localStorage.getItem('vr_scores') || '[]');
+    // Deduplicate by name (case-insensitive), keep highest score
+    const map = new Map();
+    raw.forEach(s => {
+      const key = (s.name || '').toLowerCase();
+      if (!map.has(key) || (s.score ?? 0) > (map.get(key).score ?? 0)) {
+        map.set(key, s);
+      }
+    });
+    return Array.from(map.values()).sort((a,b) => (b.score??0) - (a.score??0));
+  } catch { return []; }
 }
 function saveScores(arr) {
-  localStorage.setItem('vr_scores', JSON.stringify(arr));
+  // Always deduplicate before saving
+  const map = new Map();
+  arr.forEach(s => {
+    const key = (s.name || '').toLowerCase();
+    if (!map.has(key) || (s.score ?? 0) > (map.get(key).score ?? 0)) {
+      map.set(key, s);
+    }
+  });
+  const clean = Array.from(map.values()).sort((a,b)=>(b.score??0)-(a.score??0)).slice(0,20);
+  localStorage.setItem('vr_scores', JSON.stringify(clean));
 }
 
 function initStars() {
@@ -1673,62 +1845,43 @@ function drawMeteor(m) {
     });
   }
   const glow = 0.10 + Math.sin(m.glowPulse) * 0.04;
-  // For normal meteors: wrap around world edges. For void meteors: use direct coords.
   const {x: wx, y: wy} = m.isVoidMeteor ? {x: m.x, y: m.y} : wrapAdjust(m.x, m.y);
-  // Light angle shared by both render paths
   const la = m.lightAngle + m.angle * 0.4;
   if (m.isVoidMeteor) {
-    const lx = Math.cos(la), ly = Math.sin(la);
-    const hx = lx * m.size * 0.35, hy = ly * m.size * 0.35;
-
+    const vt = m.voidType || 0;
+    const lxv=Math.cos(la), lyv=Math.sin(la);
+    const hxv=lxv*m.size*0.35, hyv=lyv*m.size*0.35;
+    const glowCols =['rgba(140,60,255,','rgba(220,60,255,','rgba(40,0,100,','rgba(255,40,40,'];
+    const baseCols=[['#1e0038','#0d0020','#050010'],['#2e006e','#180040','#0a001e'],['#0a0018','#060010','#020008'],['#3e0000','#200000','#080000']];
+    const specCols=['rgba(180,120,255,','rgba(255,160,255,','rgba(100,60,180,','rgba(255,120,80,'];
+    const outlines=['rgba(160,80,255,0.7)','rgba(240,100,255,0.9)','rgba(80,40,160,0.45)','rgba(255,80,50,0.95)'];
+    const glowMult=[1.5,1.7,1.3,1.4];
     ctx.save();
-    ctx.translate(wx, wy);
-    ctx.rotate(m.angle);
-
-    // Outer violet glow
-    const og = ctx.createRadialGradient(0,0,m.size*0.3,0,0,m.size*1.5);
-    og.addColorStop(0,'rgba(120,0,255,0.18)');
-    og.addColorStop(1,'rgba(60,0,120,0)');
-    ctx.beginPath(); ctx.arc(0,0,m.size*1.5,0,Math.PI*2); ctx.fillStyle=og; ctx.fill();
-
-    // Rock shape
+    ctx.translate(wx,wy); ctx.rotate(m.angle);
+    const og2=ctx.createRadialGradient(0,0,m.size*0.3,0,0,m.size*glowMult[vt]);
+    og2.addColorStop(0,glowCols[vt]+'0.30)'); og2.addColorStop(1,glowCols[vt]+'0)');
+    ctx.beginPath(); ctx.arc(0,0,m.size*glowMult[vt],0,Math.PI*2); ctx.fillStyle=og2; ctx.fill();
     ctx.beginPath();
-    m.shape.forEach((p,i) => {
-      if(i===0) ctx.moveTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
-      else ctx.lineTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
-    });
-    ctx.closePath();
-    ctx.save(); ctx.clip();
-
-    // Base: obsidian black with slight lit face
-    const rg = ctx.createRadialGradient(hx,hy,0,0,0,m.size*1.1);
-    rg.addColorStop(0,'#1a0028');   // lit — dark purple-black
-    rg.addColorStop(0.45,'#0d0015');
-    rg.addColorStop(1,'#050008');   // shadow — near total black
-    ctx.fillStyle=rg; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
-
-    // Shadow
-    const shd=ctx.createRadialGradient(-hx,-hy,0,-hx,-hy,m.size*1.2);
-    shd.addColorStop(0,'rgba(0,0,0,0.7)'); shd.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=shd; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
-
-    // Specular (faint violet sheen)
-    const sp=ctx.createRadialGradient(hx,hy,0,hx,hy,m.size*0.4);
-    sp.addColorStop(0,'rgba(180,100,255,0.35)');
-    sp.addColorStop(1,'rgba(0,0,0,0)');
-    ctx.fillStyle=sp; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
+    m.shape.forEach((p,i)=>{ if(i===0) ctx.moveTo(Math.cos(p.a)*p.r,Math.sin(p.a)*p.r); else ctx.lineTo(Math.cos(p.a)*p.r,Math.sin(p.a)*p.r); });
+    ctx.closePath(); ctx.save(); ctx.clip();
+    const bc=baseCols[vt];
+    const rg2=ctx.createRadialGradient(hxv,hyv,0,0,0,m.size*1.1);
+    rg2.addColorStop(0,bc[0]); rg2.addColorStop(0.5,bc[1]); rg2.addColorStop(1,bc[2]);
+    ctx.fillStyle=rg2; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
+    const shd2=ctx.createRadialGradient(-hxv,-hyv,0,-hxv,-hyv,m.size*1.2);
+    shd2.addColorStop(0,'rgba(0,0,0,0.75)'); shd2.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=shd2; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
+    const sp2=ctx.createRadialGradient(hxv,hyv,0,hxv,hyv,m.size*0.4);
+    sp2.addColorStop(0,specCols[vt]+'0.55)'); sp2.addColorStop(1,specCols[vt]+'0)');
+    ctx.fillStyle=sp2; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);
+    if(vt===2){ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fillRect(-m.size*1.5,-m.size*1.5,m.size*3,m.size*3);}
+    if(vt===1){ctx.beginPath(); ctx.arc(0,0,m.size*0.35,0,Math.PI*2); ctx.fillStyle='rgba(200,80,255,0.5)'; ctx.fill();}
     ctx.restore();
-
-    // Outline
     ctx.beginPath();
-    m.shape.forEach((p,i) => {
-      if(i===0) ctx.moveTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
-      else ctx.lineTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
-    });
-    ctx.closePath();
-    ctx.strokeStyle='rgba(140,60,255,0.5)'; ctx.lineWidth=1; ctx.stroke();
+    m.shape.forEach((p,i)=>{ if(i===0) ctx.moveTo(Math.cos(p.a)*p.r,Math.sin(p.a)*p.r); else ctx.lineTo(Math.cos(p.a)*p.r,Math.sin(p.a)*p.r); });
+    ctx.closePath(); ctx.strokeStyle=outlines[vt]; ctx.lineWidth=vt===1?1.8:1.3; ctx.stroke();
     ctx.restore();
-    return;  // early exit — skip normal rendering
+    return;
   }
   const lx = Math.cos(la), ly = Math.sin(la);
   const hx = lx * m.size * 0.35, hy = ly * m.size * 0.35;
@@ -2062,16 +2215,28 @@ function spawnDeathExplosion(x, y) {
 
 // ─── ALIEN SHIPS ─────────────────────────────────────────────────
 // Types: 0=Scout(common) 1=Chaotic(shooter) 2=Bomber(meteors) 3=Dreadnought(tanky)
-const ALIEN_WEIGHTS = [0.44, 0.24, 0.14, 0.18]; // Scout, Chaotic, Bomber, Dreadnought
+const ALIEN_WEIGHTS = [0.46, 0.26, 0.18, 0.10]; // Scout, Chaotic, Bomber, Dreadnought
 
 function spawnAlien() {
   if (aliens.length >= 8) return;
-  const side = Math.floor(Math.random()*4);
+
+  // 50% chance: spawn near camera edge (classic). 50%: random world position far from player.
   let x, y;
-  if (side===0){ x=camera.x-W/2-90; y=camera.y+(Math.random()-0.5)*H; }
-  else if(side===1){ x=camera.x+W/2+90; y=camera.y+(Math.random()-0.5)*H; }
-  else if(side===2){ x=camera.x+(Math.random()-0.5)*W; y=camera.y-H/2-90; }
-  else            { x=camera.x+(Math.random()-0.5)*W; y=camera.y+H/2+90; }
+  if (Math.random() < 0.5) {
+    // Near current viewport edge
+    const side = Math.floor(Math.random()*4);
+    if (side===0){ x=camera.x-W/2-90; y=camera.y+(Math.random()-0.5)*H; }
+    else if(side===1){ x=camera.x+W/2+90; y=camera.y+(Math.random()-0.5)*H; }
+    else if(side===2){ x=camera.x+(Math.random()-0.5)*W; y=camera.y-H/2-90; }
+    else            { x=camera.x+(Math.random()-0.5)*W; y=camera.y+H/2+90; }
+  } else {
+    // Random world position (will drift toward player via orbit)
+    x = Math.random() * WORLD_W;
+    y = Math.random() * WORLD_H;
+    // Ensure at least 600px from current player position to avoid instant contact
+    const dx = x - player.x, dy = y - player.y;
+    if (Math.sqrt(dx*dx+dy*dy) < 600) x += 700;
+  }
 
   // Weighted type selection
   const rng = Math.random();
@@ -2097,7 +2262,7 @@ function spawnAlien() {
     glowPulse: Math.random()*Math.PI*2,
     radius: 24,
     type,
-    hp: type === 3 ? 5 : 1,      // Dreadnought needs 5 hits
+    hp: type === 3 ? 5 : 3,      // Dreadnought needs 5 hits, others need 3
     shootCooldown: type === 1 ? 1.5 : type === 2 ? 4 : 3 + Math.random()*4,
     pertSeedX: Math.random()*100,
     pertSeedY: Math.random()*100,
@@ -2267,12 +2432,7 @@ function drawAliens() {
         ctx.fillStyle='rgba(180,130,0,0.9)';
         ctx.fillRect(16,-3,10,6); ctx.restore();
       }
-      // HP bars (small dots above)
-      for(let h=0;h<5;h++){
-        ctx.beginPath(); ctx.arc(-10+h*5,-30,2.5,0,Math.PI*2);
-        ctx.fillStyle = h < a.hp ? 'rgba(255,200,0,0.95)' : 'rgba(80,60,0,0.5)';
-        ctx.fill();
-      }
+      // HP bars hidden — dreadnought doesn't reveal its HP
       ctx.save(); ctx.scale(1,0.85);
       ctx.beginPath(); ctx.arc(0,-5,14,Math.PI,0); ctx.closePath();
       ctx.fillStyle='rgba(255,180,0,0.55)'; ctx.fill();
@@ -2331,9 +2491,10 @@ function updateAndDrawAlienBullets(dt) {
 }
 
 // ─── POWER-UP SYSTEM ─────────────────────────────────────────────
-const SUPER_DURATION = 60;  // 1 minute — the rarest boost
+const SUPER_DURATION = 45;  // 45 seconds — powerful star power
 let rapidFireTimer = 0;    // type 1 drop
 let shieldTimer = 0;       // type 2 drop
+let shipAbilityTimer = 0;  // active ship-specific ability
 
 function updateAndDrawPowerUps(dt) {
   // Tick active effects
@@ -2408,7 +2569,25 @@ function updateAndDrawPowerUps(dt) {
       ctx.beginPath(); ctx.arc(0,0,4,0,Math.PI*2);
       ctx.fillStyle=`rgba(255,255,255,${alpha*0.6})`; ctx.fill();
 
-    } else if (pu.kind === 3) {
+    } else if (pu.kind === 4) {
+      // ⚡ Ship ability — small bright blinking star in ship's accent color
+      const pr2 = 18 + Math.sin(pu.pulse)*4;
+      const aura2 = ctx.createRadialGradient(0,0,0,0,0,pr2);
+      aura2.addColorStop(0,col+'88'); aura2.addColorStop(1,col+'00');
+      ctx.beginPath(); ctx.arc(0,0,pr2,0,Math.PI*2); ctx.fillStyle=aura2; ctx.fill();
+      ctx.rotate(pu.angle);
+      // Small 4-pointed star
+      ctx.beginPath();
+      for (let i=0; i<8; i++) {
+        const r3 = i%2===0 ? 11 : 4;
+        const a3 = (i/8)*Math.PI*2 - Math.PI/4;
+        if(i===0) ctx.moveTo(Math.cos(a3)*r3, Math.sin(a3)*r3);
+        else ctx.lineTo(Math.cos(a3)*r3, Math.sin(a3)*r3);
+      }
+      ctx.closePath();
+      ctx.fillStyle=`rgba(255,255,255,${alpha*0.9})`; ctx.fill();
+      ctx.strokeStyle=col+Math.floor(alpha*255).toString(16).padStart(2,'0');
+      ctx.lineWidth=1.5; ctx.stroke();
       // ⭐ Star — gold 5-pointed
       ctx.beginPath();
       for (let i=0; i<10; i++) {
@@ -2452,12 +2631,68 @@ function collectPowerUp(pu) {
 
   } else if (pu.kind === 2) {
     // 🛡 Shield: 8 seconds of full invincibility
-    shieldTimer = 8;
+    shieldTimer = 30;  // 30 seconds shield
     player.invincible = 8;
+
+  } else if (pu.kind === 4) {
+    shipAbilityTimer = 12;
+    activateShipAbility();
 
   } else if (pu.kind === 3) {
     // ⭐ Star Power — the rarest, 45s
     activateSuperMode();
+  }
+}
+
+function activateShipAbility() {
+  // Flash in ship color
+  const col = SKINS[selectedSkin]?.accent || '#00f5ff';
+  for (let i=0;i<25;i++) {
+    const a=Math.random()*Math.PI*2, sp=60+Math.random()*160;
+    particles.push({x:player.x,y:player.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+      life:1,maxLife:0.5+Math.random()*0.4,size:2+Math.random()*6,color:col});
+  }
+  particles.push({x:player.x,y:player.y,vx:0,vy:0,life:1,maxLife:0.3,size:70,color:col,isRing:true});
+}
+
+function updateShipAbility(dt) {
+  if (shipAbilityTimer <= 0) return;
+  shipAbilityTimer -= dt;
+
+  if (selectedSkin === 0) {
+    // VIPER — double shot: every bullet fires a twin alongside
+    // Handled in tryShoot (twin spawn added below)
+
+  } else if (selectedSkin === 1) {
+    // SCORPION — chain explosion: meteors exploding nearby chain
+    // Nothing continuous needed; handled via bullet-hit bonus
+
+  } else if (selectedSkin === 2) {
+    // PHANTOM — invisibility: meteors pass through (no collision)
+    player.invincible = Math.max(player.invincible, 0.1);
+
+  } else if (selectedSkin === 3) {
+    // TITAN — supernova aura: pulse every 2.5s
+    if (!player._novaTimer) player._novaTimer = 0;
+    player._novaTimer -= dt;
+    if (player._novaTimer <= 0) {
+      player._novaTimer = 2.5;
+      // Destroy all meteors within 400px
+      for (let i=meteors.length-1;i>=0;i--) {
+        const m=meteors[i];
+        if (Math.hypot(m.x-player.x, m.y-player.y) < 400+m.size) {
+          splitMeteor(m, m.x, m.y);
+          score += m.special?7:(m.fast?5:3);
+          meteors.splice(i,1);
+        }
+      }
+      particles.push({x:player.x,y:player.y,vx:0,vy:0,life:1,maxLife:0.5,size:420,color:'#ffd700',isRing:true});
+      for (let i=0;i<30;i++){
+        const a=Math.random()*Math.PI*2,sp=150+Math.random()*300;
+        particles.push({x:player.x,y:player.y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp,
+          life:1,maxLife:0.5+Math.random()*0.4,size:2+Math.random()*7,color:'#ffd700'});
+      }
+    }
   }
 }
 
@@ -2486,7 +2721,7 @@ function updateSuperMode(dt) {
   }
 
   // ── Invisible shield: auto-destroy nearby meteors ──
-  const shieldR = 160;
+  const shieldR = 220;
   for (let i = meteors.length-1; i>=0; i--) {
     const m = meteors[i];
     const dx = m.x - player.x, dy = m.y - player.y;
@@ -2498,33 +2733,31 @@ function updateSuperMode(dt) {
     }
   }
 
-  // Super mode = full invincibility
+  // Super mode = full invincibility + unlimited ammo
   player.invincible = 0.5;
+  player.ammoCharge = 1;
 
-  // ── Homing missiles: auto-fire, unlimited ammo in super ──
+  // ── Homing missiles: triple fire rate, target 2 nearest meteors ──
   if (player.shootCooldown <= 0) {
-    // Find closest meteor within 350px
-    let closest = null, closestDist = 350;
-    for (const m of meteors) {
-      const dx = m.x - player.x, dy = m.y - player.y;
-      const d = Math.sqrt(dx*dx+dy*dy);
-      if (d < closestDist) { closest = m; closestDist = d; }
-    }
-    if (closest) {
-      const ang = Math.atan2(closest.y - player.y, closest.x - player.x);
-      const stats = SHIP_STATS[selectedSkin] || SHIP_STATS[0];
-      player.shootCooldown = stats.cooldown * 0.5;  // 2× fire rate in super
-      player.ammoCharge = Math.max(0, player.ammoCharge - 0.03);
+    const stats = SHIP_STATS[selectedSkin] || SHIP_STATS[0];
+    player.shootCooldown = stats.cooldown * 0.33; // 3× fire rate
+    const targets = meteors
+      .map(m => ({ m, d: Math.hypot(m.x-player.x, m.y-player.y) }))
+      .filter(t => t.d < 500)
+      .sort((a,b)=>a.d-b.d)
+      .slice(0,2);
+    targets.forEach(({ m: tgt }) => {
+      const ang = Math.atan2(tgt.y - player.y, tgt.x - player.x);
       bullets.push({
         x: player.x + Math.cos(ang)*16,
         y: player.y + Math.sin(ang)*16,
-        vx: Math.cos(ang)*stats.bulletSpeed*1.3 + player.vx*0.3,
-        vy: Math.sin(ang)*stats.bulletSpeed*1.3 + player.vy*0.3,
-        angle: ang, life:1, maxLife:1.6,
-        type: stats.bulletType, pierces: 2,
-        homing: true, target: closest,
+        vx: Math.cos(ang)*stats.bulletSpeed*1.5 + player.vx*0.3,
+        vy: Math.sin(ang)*stats.bulletSpeed*1.5 + player.vy*0.3,
+        angle: ang, life:1, maxLife:1.8,
+        type: stats.bulletType, pierces: 3,
+        homing: true, target: tgt,
       });
-    }
+    });
   }
 
   // ── Homing: steer active bullets toward their target ──
@@ -2620,20 +2853,40 @@ function damagePlayer(amount) {
 }
 
 function updateHpBar() {
-  const el = document.getElementById('hp-hearts');
-  if (!el || !player) return;
+  if (!player) return;
   const hp = player.hp, max = player.maxHp;
-  // Show as a segmented bar of 20 small blocks
-  el.innerHTML = '';
-  for (let i=0; i<max; i++) {
-    const block = document.createElement('span');
-    block.style.cssText = `display:inline-block;width:6px;height:14px;border-radius:2px;margin:0 1px;` +
-      `background:${i < hp
-        ? (hp <= 5 ? '#ff3300' : hp <= 10 ? '#ff8800' : '#00ff60')
-        : 'rgba(255,255,255,0.10)'};` +
-      `box-shadow:${i < hp ? (hp<=5?'0 0 5px #ff3300':'0 0 5px #00cc44') : 'none'};`;
-    el.appendChild(block);
-  }
+  const pct = Math.max(0, (hp / max) * 100);
+  const col = hp <= 5 ? '#ff3300' : hp <= 10 ? '#ff8800' : '#00ff60';
+  const inner = document.getElementById('hp-bar-inner');
+  const txt   = document.getElementById('hp-text');
+  if (inner) { inner.style.width = pct + '%'; inner.style.background = `linear-gradient(90deg,${col},${col}aa)`; }
+  if (txt)   { txt.textContent = hp + '/' + max; txt.style.color = col; }
+}
+
+function updatePowerupSidebar() {
+  const sidebar = document.getElementById('powerup-sidebar');
+  if (!sidebar) return;
+  sidebar.innerHTML = '';
+  const items = [];
+  if (player.superMode)    items.push({ icon:'⭐', label:'STAR',   timer:player.superTimer, max:SUPER_DURATION, col:'#ffd700' });
+  if (rapidFireTimer > 0)  items.push({ icon:'⚡', label:'RAPID',  timer:rapidFireTimer,    max:30,             col:'#ff8800' });
+  if (shieldTimer > 0)     items.push({ icon:'🛡', label:'SHIELD', timer:shieldTimer,       max:30,             col:'#cc44ff' });
+  if (shipAbilityTimer>0)  items.push({ icon:'🔥', label:SKINS[selectedSkin]?.ability||'ABILITY', timer:shipAbilityTimer, max:12, col:SKINS[selectedSkin]?.accent||'#00f5ff' });
+  items.forEach(it => {
+    const pct = Math.max(0, (it.timer / it.max) * 100);
+    const div = document.createElement('div');
+    div.style.cssText = `display:flex;align-items:center;gap:8px;background:rgba(0,0,0,0.55);border:1px solid ${it.col}44;border-radius:4px;padding:5px 10px;backdrop-filter:blur(6px);`;
+    div.innerHTML = `<span style="font-size:16px;">${it.icon}</span>
+      <span style="display:flex;flex-direction:column;gap:2px;min-width:60px;">
+        <span style="font-family:Orbitron,sans-serif;font-size:9px;color:${it.col};letter-spacing:0.15em;">${it.label}</span>
+        <span style="display:block;width:60px;height:4px;background:rgba(255,255,255,0.12);border-radius:2px;">
+          <span style="display:block;height:100%;width:${pct}%;background:${it.col};border-radius:2px;transition:width 0.1s;"></span>
+        </span>
+        <span style="font-size:9px;color:rgba(200,232,248,0.5);font-family:'Share Tech Mono',monospace;">${Math.ceil(it.timer)}s</span>
+      </span>`;
+    sidebar.appendChild(div);
+  });
+  sidebar.style.display = items.length ? 'flex' : 'none';
 }
 
 function checkAlienCollisions() {
@@ -2661,21 +2914,31 @@ function checkAlienCollisions() {
           score += a.type===3 ? 50 : 20;
 
           // Each alien type drops a unique power-up
-          const dropColors = {
-            0: '#00ff60',  // Scout → Health (green)
-            1: '#ff6600',  // Chaotic → Rapid Fire (orange)
-            2: '#cc44ff',  // Bomber → Shield (purple)
-            3: '#ffd700',  // Dreadnought → Star Power (gold)
-          };
-          powerUps.push({
-            x: a.x, y: a.y,
-            vx: (Math.random()-0.5)*50, vy: (Math.random()-0.5)*50,
-            angle: 0, pulse: 0,
-            life: 25,
-            kind: a.type,          // 0=health, 1=rapidfire, 2=shield, 3=star
-            col: dropColors[a.type],
-          });
-          toKill.add(i);
+  // Dreadnought drops BOTH star power AND a ship-ability pickup
+  const dropColors = {
+    0: '#00ff60',  // Scout → Health
+    1: '#ff6600',  // Chaotic → Rapid Fire
+    2: '#cc44ff',  // Bomber → Shield
+    3: '#ffd700',  // Dreadnought → Star Power
+  };
+  powerUps.push({
+    x: a.x, y: a.y,
+    vx: (Math.random()-0.5)*50, vy: (Math.random()-0.5)*50,
+    angle: 0, pulse: 0, life: 25,
+    kind: a.type,
+    col: dropColors[a.type],
+  });
+  // Additionally spawn a ship-ability star nearby
+  if (a.type === 3) {
+    powerUps.push({
+      x: a.x + (Math.random()-0.5)*100, y: a.y + (Math.random()-0.5)*100,
+      vx: (Math.random()-0.5)*30, vy: (Math.random()-0.5)*30,
+      angle: 0, pulse: 0, life: 30,
+      kind: 4,  // ship ability
+      col: SKINS[selectedSkin]?.accent || '#00f5ff',
+    });
+  }
+  toKill.add(i);
         }
         return false; // consume bullet
       }
@@ -2706,10 +2969,28 @@ function enterVoid(bh) {
   voidPortalAngle = 0;
   voidTransition = { active: true, t: 0, duration: 2.8 }; // vortex animation
 
-  // Reset player to center of void dimension (done after transition ends)
+  // Reset player to void center IMMEDIATELY (before transition)
+  player.x = 5000; player.y = 5000;
+  player.vx = 0;   player.vy = 0;
   voidCamera.x = 5000; voidCamera.y = 5000;
 
-  // ── Rich void star field — multiple layers ──
+  // Spawn initial void meteors and turrets after transition
+  setTimeout(() => {
+    if (!inVoid) return;
+    for (let i=0; i<8; i++) spawnVoidMeteor();
+    voidTurrets = [];
+    voidTurretBullets = [];
+    for (let i=0; i<6; i++) {
+      voidTurrets.push({
+        x: 3500 + Math.random()*3000,
+        y: 3500 + Math.random()*3000,
+        angle: Math.random()*Math.PI*2,
+        shootCooldown: 2 + Math.random()*3,
+        hp: 3,
+        pulse: Math.random()*Math.PI*2,
+      });
+    }
+  }, 2900);
   voidStars = [];
   // Far layer: tiny, very dim, slightly blue-grey
   for (let i=0; i<200; i++) voidStars.push({
@@ -2740,8 +3021,9 @@ function enterVoid(bh) {
   });
 
   // ── Void world objects (distant, atmospheric) ──
+  // ── Void world objects ──
   voidWorldObjects = [];
-  // Dead nebulae (very dark, barely visible)
+  // Void nebulae
   for (let i=0; i<6; i++) voidWorldObjects.push({
     type:'voidNebula',
     wx:3000+Math.random()*4000, wy:3000+Math.random()*4000,
@@ -2749,7 +3031,7 @@ function enterVoid(bh) {
     col:[40+Math.floor(Math.random()*30), 0, 80+Math.floor(Math.random()*80)],
     alpha:0.06+Math.random()*0.06,
   });
-  // Void anomalies (pulsing orbs)
+  // Void anomaly orbs
   for (let i=0; i<5; i++) voidWorldObjects.push({
     type:'voidOrb',
     wx:2500+Math.random()*5000, wy:2500+Math.random()*5000,
@@ -2757,7 +3039,7 @@ function enterVoid(bh) {
     phase:Math.random()*Math.PI*2,
     col:[100+Math.floor(Math.random()*100), 0, 180+Math.floor(Math.random()*75)],
   });
-  // Dark star clusters (shadow clusters)
+  // Void star clusters
   for (let i=0; i<4; i++) {
     const cr = 100+Math.floor(Math.random()*80), cb = 180+Math.floor(Math.random()*75);
     voidWorldObjects.push({
@@ -2766,15 +3048,13 @@ function enterVoid(bh) {
       r:120+Math.random()*160,
       clusterStars: Array.from({length:35}, () => ({
         dx:(Math.random()-0.5)*260, dy:(Math.random()-0.5)*260,
-        r:Math.random()*1.4+0.3, alpha:Math.random()*0.5+0.15,
-        cr, cb,
+        r:Math.random()*1.4+0.3, alpha:Math.random()*0.5+0.15, cr, cb,
       })),
     });
   }
-  // Void rifts (thin glowing cracks)
+  // Void rifts
   for (let i=0; i<6; i++) {
-    const len = 200+Math.random()*400;
-    const angle = Math.random()*Math.PI*2;
+    const len = 200+Math.random()*400, angle = Math.random()*Math.PI*2;
     voidWorldObjects.push({
       type:'voidRift',
       wx:2000+Math.random()*6000, wy:2000+Math.random()*6000,
@@ -2784,26 +3064,76 @@ function enterVoid(bh) {
       col:[120+Math.floor(Math.random()*80), 0, 200+Math.floor(Math.random()*55)],
     });
   }
+  // ── Void Supernovas (3-5) — dangerous expanding shockwaves ──
+  for (let i=0; i<4; i++) voidWorldObjects.push({
+    type:'voidSupernova',
+    wx:2000+Math.random()*6000, wy:2000+Math.random()*6000,
+    phase: Math.random()*Math.PI*2,
+    speed: 0.6+Math.random()*0.8,
+    maxR: 260+Math.random()*180,
+    col:[[255,80,30],[200,80,255],[80,200,255],[255,200,30]][i%4],
+  });
 
-  // Spawn initial void meteors (after transition completes)
-  setTimeout(() => {
-    player.x = 5000; player.y = 5000;
-    player.vx = 0; player.vy = 0;
-    for (let i=0; i<8; i++) spawnVoidMeteor();
-    // Spawn turrets scattered around the void
-    voidTurrets = [];
-    voidTurretBullets = [];
-    for (let i=0; i<6; i++) {
-      voidTurrets.push({
-        x: 3500 + Math.random()*3000,
-        y: 3500 + Math.random()*3000,
-        angle: Math.random()*Math.PI*2,
-        shootCooldown: 2 + Math.random()*3,
-        hp: 3,
-        pulse: Math.random()*Math.PI*2,
-      });
+  // (meteor/turret spawning done in the earlier setTimeout above)
+}
+
+function drawVoidExitTransition(prog) {
+  const cx = W/2, cy = H/2;
+
+  if (prog < 0.35) {
+    // Phase 1: void world shakes and implodes — spiral streaks inward
+    const p = prog / 0.35;
+    // Darkening vignette
+    const vig = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W,H)*0.8*(1-p*0.4));
+    vig.addColorStop(0,'rgba(0,0,0,0)');
+    vig.addColorStop(0.6,`rgba(30,0,60,${p*0.3})`);
+    vig.addColorStop(1,`rgba(0,0,0,${p*0.8})`);
+    ctx.fillStyle=vig; ctx.fillRect(0,0,W,H);
+
+    // Inward spiral streaks (reverse of entry)
+    const numRays = 20;
+    for (let i=0; i<numRays; i++) {
+      const angle = (i/numRays)*Math.PI*2 - voidElapsed*2.2;
+      const outerR = Math.max(W,H)*0.8;
+      const innerR = outerR*0.05 + p*p*outerR*0.8;
+      const alpha = (1-p) * 0.30;
+      ctx.beginPath();
+      ctx.moveTo(cx+Math.cos(angle)*outerR, cy+Math.sin(angle)*outerR);
+      ctx.lineTo(cx+Math.cos(angle)*innerR, cy+Math.sin(angle)*innerR);
+      ctx.strokeStyle=`rgba(180,80,255,${alpha})`; ctx.lineWidth=1.5; ctx.stroke();
     }
-  }, 2800);
+
+    // Collapsing rings from outside inward
+    for (let i=0; i<8; i++) {
+      const phase = (i/8 + voidElapsed*0.5) % 1;
+      const r = Math.max(W,H)*0.7 * (1-phase) * (1-p*0.6);
+      if (r < 10) continue;
+      ctx.beginPath(); ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.strokeStyle=`rgba(140,60,255,${phase*0.5*(1-p)})`;
+      ctx.lineWidth=2; ctx.stroke();
+    }
+
+  } else if (prog < 0.6) {
+    // Phase 2: white-violet blinding flash (reverse: bright → fades)
+    const p2 = (prog - 0.35) / 0.25;
+    const brightness = 1 - p2;
+    ctx.fillStyle=`rgba(255,255,255,${brightness*0.92})`; ctx.fillRect(0,0,W,H);
+    ctx.fillStyle=`rgba(200,100,255,${brightness*0.5})`; ctx.fillRect(0,0,W,H);
+
+  } else {
+    // Phase 3: main world fades in from black
+    const p3 = (prog - 0.6) / 0.4;
+    // The main world is already behind (drawBackground + drawStars run each frame)
+    // Just overlay a fading black
+    ctx.fillStyle=`rgba(0,0,0,${1-p3})`; ctx.fillRect(0,0,W,H);
+    // Expanding bright ring — "burst" into new world
+    const burstR = p3 * Math.max(W,H) * 0.9;
+    const burst = ctx.createRadialGradient(cx,cy,burstR*0.7,cx,cy,burstR);
+    burst.addColorStop(0,'rgba(180,100,255,0)');
+    burst.addColorStop(0.5,`rgba(180,100,255,${(1-p3)*0.35})`);
+    burst.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=burst; ctx.fillRect(0,0,W,H);
+  }
 }
 
 function exitVoid() {
@@ -2818,15 +3148,19 @@ function exitVoid() {
 
 function spawnVoidMeteor() {
   const side = Math.floor(Math.random()*4);
-  const s = Math.random()*32+18;
-  const speed = Math.random()*110+70;  // much faster than normal
+  const rng = Math.random();
+  // 0=black standard, 1=plasma purple, 2=ghost dark-transparent, 3=shard fast red
+  const vtype = rng < 0.45 ? 0 : rng < 0.68 ? 1 : rng < 0.85 ? 2 : 3;
+  const s = vtype===3 ? Math.random()*16+10 : Math.random()*32+18;
+  const speed = (Math.random()*110+70) * (vtype===3 ? 1.7 : 1);
   let x, y, vx, vy;
   if (side===0){ x=voidCamera.x-W/2-s; y=voidCamera.y+(Math.random()-0.5)*H; vx=speed; vy=(Math.random()-0.5)*speed; }
   else if(side===1){ x=voidCamera.x+W/2+s; y=voidCamera.y+(Math.random()-0.5)*H; vx=-speed; vy=(Math.random()-0.5)*speed; }
   else if(side===2){ x=voidCamera.x+(Math.random()-0.5)*W; y=voidCamera.y-H/2-s; vx=(Math.random()-0.5)*speed; vy=speed; }
   else            { x=voidCamera.x+(Math.random()-0.5)*W; y=voidCamera.y+H/2+s; vx=(Math.random()-0.5)*speed; vy=-speed; }
   const m = makeMeteor(s, x, y, vx, vy, false, false);
-  m.isVoidMeteor = true;  // flagged for black rendering
+  m.isVoidMeteor = true;
+  m.voidType = vtype;
   voidMeteors.push(m);
 }
 
@@ -2996,8 +3330,37 @@ function drawVoidBackground(showHUD = true) {
       cg.addColorStop(1,`rgba(${Math.max(0,r-60)},0,${Math.max(0,b-60)},0)`);
       ctx.beginPath(); ctx.arc(obj.wx,obj.wy,obj.r,0,Math.PI*2); ctx.fillStyle=cg; ctx.fill();
 
+    } else if (obj.type === 'voidSupernova') {
+      obj.phase = (obj.phase||0) + obj.speed * 0.016;
+      const pulse = 0.7 + Math.sin(obj.phase)*0.3;
+      const r = obj.maxR * pulse;
+      const [sr,sg,sb]=obj.col;
+      // Outer expanding shell
+      const sg2=ctx.createRadialGradient(obj.wx,obj.wy,r*0.5,obj.wx,obj.wy,r);
+      sg2.addColorStop(0,`rgba(${sr},${sg},${sb},0.0)`);
+      sg2.addColorStop(0.65,`rgba(${sr},${sg},${sb},0.14)`);
+      sg2.addColorStop(0.85,`rgba(${sr},${sg},${sb},0.22)`);
+      sg2.addColorStop(1,`rgba(${sr},${sg},${sb},0.0)`);
+      ctx.beginPath(); ctx.arc(obj.wx,obj.wy,r,0,Math.PI*2);
+      ctx.fillStyle=sg2; ctx.fill();
+      // Filament rays
+      for(let i=0;i<8;i++){
+        const fa=(i/8)*Math.PI*2+obj.phase*0.2;
+        const fl=r*(0.6+Math.sin(obj.phase*1.5+i)*0.15);
+        ctx.beginPath(); ctx.moveTo(obj.wx,obj.wy);
+        ctx.lineTo(obj.wx+Math.cos(fa)*fl, obj.wy+Math.sin(fa)*fl);
+        ctx.strokeStyle=`rgba(${sr},${sg},${sb},0.10)`; ctx.lineWidth=2; ctx.stroke();
+      }
+      // Bright core remnant
+      const cg2=ctx.createRadialGradient(obj.wx,obj.wy,0,obj.wx,obj.wy,r*0.08);
+      cg2.addColorStop(0,'rgba(255,255,255,0.85)');
+      cg2.addColorStop(0.5,`rgba(${sr},${sg},${sb},0.5)`);
+      cg2.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.beginPath(); ctx.arc(obj.wx,obj.wy,r*0.08,0,Math.PI*2);
+      ctx.fillStyle=cg2; ctx.fill();
+
     } else if (obj.type === 'voidCluster') {
-      obj.clusterStars.forEach(s => {
+      if (obj.clusterStars) obj.clusterStars.forEach(s => {
         ctx.beginPath(); ctx.arc(obj.wx+s.dx, obj.wy+s.dy, s.r, 0, Math.PI*2);
         ctx.fillStyle=`rgba(${s.cr},120,${s.cb},${s.alpha})`;
         ctx.fill();
@@ -3005,7 +3368,6 @@ function drawVoidBackground(showHUD = true) {
 
     } else if (obj.type === 'voidRift') {
       const [r,g,b]=[obj.col[0],obj.col[1],obj.col[2]];
-      // Glow
       ctx.save();
       ctx.shadowColor=`rgba(${r},${g},${b},0.8)`;
       ctx.shadowBlur=8;
@@ -3035,20 +3397,24 @@ function drawVoidBackground(showHUD = true) {
   if (!showHUD) return;
 
   // ── Void HUD ──
-  const progress=Math.min(1,voidElapsed/30);
+  const VOID_DURATION = 45;
+  const progress=Math.min(1,voidElapsed/VOID_DURATION);
+  const remaining = Math.max(0, Math.ceil(VOID_DURATION - voidElapsed));
   ctx.font='700 11px "Orbitron",sans-serif';
   ctx.textAlign='center';
   ctx.fillStyle='rgba(160,80,255,0.6)';
   ctx.fillText('◈ VOID DIMENSION ◈', W/2, 55);
+  // Progress bar
   ctx.fillStyle='rgba(80,0,160,0.45)';
-  ctx.fillRect(W/2-100,60,200,4);
-  const barCol = progress > 0.85 ? 'rgba(220,150,255,0.95)' : 'rgba(160,80,255,0.85)';
+  ctx.fillRect(W/2-100,62,200,5);
+  const barCol = progress > 0.75 ? `rgba(255,${Math.floor(80+progress*120)},255,0.95)` : 'rgba(160,80,255,0.85)';
   ctx.fillStyle=barCol;
-  ctx.fillRect(W/2-100,60,200*progress,4);
-  if (progress >= 1) {
-    ctx.fillStyle=`rgba(200,120,255,${0.5+Math.sin(voidElapsed*4)*0.3})`;
-    ctx.fillText('▶ PORTAL OPEN — FLY THROUGH', W/2, 78);
-  }
+  ctx.fillRect(W/2-100,62,200*progress,5);
+  // Countdown — big and readable
+  ctx.font=`700 ${remaining <= 10 ? 18 : 14}px "Orbitron",sans-serif`;
+  const pulse = remaining <= 10 ? (0.7+Math.sin(voidElapsed*6)*0.3) : 0.75;
+  ctx.fillStyle=`rgba(220,160,255,${pulse})`;
+  ctx.fillText(remaining + 's', W/2, 84);
   ctx.textAlign='left';
 }
 
@@ -3092,16 +3458,19 @@ function voidExplosion(x, y) {
 }
 
 function updateVoid(dt) {
-  // ── Vortex transition: freeze game, show animation ──
+  // ── Vortex entry transition: freeze game ──
   if (voidTransition.active) {
     drawVortexTransition(dt);
     return;
   }
+  // ── Exit transition: keep drawing void world but freeze gameplay ──
+  if (voidExitTransition.active) return;
 
-  // 1.875× time acceleration (25% faster than current 1.5×)
+  // 1.875× time acceleration for void-internal timer
   const vdt = dt * 1.875;
   voidElapsed += vdt;
-  score += vdt; // score also 1.5× in void
+  elapsed += dt;   // general game timer keeps running normally
+  score += vdt;    // score accrues at void speed
 
   // Camera follow
   voidCamera.x += (player.x - voidCamera.x) * Math.min(1, 12*dt);
@@ -3137,9 +3506,12 @@ function updateVoid(dt) {
   updatePlayer(player, vdt);
 
   // Portal exit — appears after 30s in void
-  const portalReady = voidElapsed >= 30;
-  // Portal sits at a fixed spot relative to void start (5500, 5500)
-  const portalX = 5500, portalY = 5000;
+  const portalReady = voidElapsed >= 45;
+
+  // Start exit animation at 45s (if not already running)
+  if (portalReady && !voidExitTransition.active) {
+    voidExitTransition = { active: true, t: 0, duration: 2.6 };
+  }
 
   // Void bullets — EXPLOSIVE
   voidBullets = voidBullets.filter(b => {
@@ -3214,16 +3586,18 @@ function updateVoid(dt) {
     ctx.restore();
   });
 
-  // Portal (if ready)
-  if (portalReady) drawVoidPortal(portalX, portalY);
-
   drawPlayer(player, dt);
   ctx.restore();
 
-  // Portal collision — exit void
-  if (portalReady) {
-    const dx=player.x-portalX, dy=player.y-portalY;
-    if (Math.sqrt(dx*dx+dy*dy) < 30) exitVoid();
+  // ── Exit transition overlay ──
+  if (voidExitTransition.active) {
+    voidExitTransition.t += dt;
+    const prog = Math.min(1, voidExitTransition.t / voidExitTransition.duration);
+    drawVoidExitTransition(prog);
+    if (prog >= 1) {
+      voidExitTransition.active = false;
+      exitVoid();
+    }
   }
 
   // Void meteor collision = death
@@ -3406,6 +3780,16 @@ function tryShoot() {
     type: stats.bulletType,
     pierces: stats.bulletType === 'rapid' ? 2 : 0,
   });
+
+  // VIPER ability: twin shot at ±0.18 rad offset
+  if (selectedSkin === 0 && shipAbilityTimer > 0) {
+    [0.18, -0.18].forEach(off => {
+      const ta = aimAngle + off;
+      bullets.push({ x:noseX, y:noseY,
+        vx:Math.cos(ta)*speed+player.vx*0.3, vy:Math.sin(ta)*speed+player.vy*0.3,
+        angle:ta, life:1, maxLife:1.4, type:'normal', pierces:0 });
+    });
+  }
 }
 
 // ─── BEAM SPLIT (TITAN — no explosion, gentle separation) ────────
@@ -3443,12 +3827,13 @@ function updateAndDrawBullets(dt) {
       if (toDestroy.has(i)) continue;
       const m = meteors[i];
       const dx = b.x - m.x, dy = b.y - m.y;
-      if (Math.sqrt(dx*dx + dy*dy) < m.size * 0.85 + 4) {
+      const hitRadius = b.type === 'beam' ? m.size * 0.85 + 12 : m.size * 0.85 + 4;
+      if (Math.sqrt(dx*dx + dy*dy) < hitRadius) {
         if (b.type === 'beam') {
           beamSplit(m, b.x, b.y);
           toDestroy.add(i);
           score += m.fast ? 5 : 3;
-          b.pierces = (b.pierces || 0) - 1;
+          b.pierces = (b.pierces ?? 2) - 1;
           if (b.pierces < 0) return false;
         } else if (b.type === 'rapid') {
           spawnBulletHit(b.x, b.y, m.fast);
@@ -3512,15 +3897,20 @@ function updateAndDrawBullets(dt) {
       ctx.beginPath(); ctx.arc(3,0,1.5,0,Math.PI*2); ctx.fillStyle=`rgba(255,220,255,${alpha})`; ctx.fill();
 
     } else if (b.type === 'beam') {
-      // Gold wide beam (TITAN)
-      const glow = ctx.createRadialGradient(0,0,0,0,0,14);
-      glow.addColorStop(0, `rgba(255,220,0,${alpha*0.3})`);
-      glow.addColorStop(1, 'rgba(255,160,0,0)');
-      ctx.beginPath(); ctx.arc(0,0,14,0,Math.PI*2); ctx.fillStyle=glow; ctx.fill();
-      const g = ctx.createLinearGradient(-18,0,6,0);
-      g.addColorStop(0,'rgba(255,180,0,0)'); g.addColorStop(0.3,`rgba(255,230,80,${alpha*0.7})`); g.addColorStop(1,`rgba(255,255,200,${alpha})`);
-      ctx.beginPath(); ctx.roundRect(-18,-4,24,8,4); ctx.fillStyle=g; ctx.fill();
-      ctx.beginPath(); ctx.arc(5,0,4,0,Math.PI*2); ctx.fillStyle=`rgba(255,255,180,${alpha})`; ctx.fill();
+      // Gold wide beam (TITAN) — extra large, devastating
+      const glow = ctx.createRadialGradient(0,0,0,0,0,22);
+      glow.addColorStop(0, `rgba(255,220,0,${alpha*0.45})`);
+      glow.addColorStop(0.5,`rgba(255,160,0,${alpha*0.2})`);
+      glow.addColorStop(1, 'rgba(255,100,0,0)');
+      ctx.beginPath(); ctx.arc(0,0,22,0,Math.PI*2); ctx.fillStyle=glow; ctx.fill();
+      const g = ctx.createLinearGradient(-22,0,9,0);
+      g.addColorStop(0,'rgba(255,180,0,0)'); g.addColorStop(0.25,`rgba(255,230,80,${alpha*0.8})`); g.addColorStop(1,`rgba(255,255,200,${alpha})`);
+      ctx.beginPath(); ctx.roundRect(-22,-7,31,14,5); ctx.fillStyle=g; ctx.fill();
+      // Bright inner core
+      const gc = ctx.createLinearGradient(-16,0,7,0);
+      gc.addColorStop(0,'rgba(255,255,100,0)'); gc.addColorStop(0.5,`rgba(255,255,200,${alpha*0.7})`); gc.addColorStop(1,`rgba(255,255,255,${alpha})`);
+      ctx.beginPath(); ctx.roundRect(-16,-3,23,6,3); ctx.fillStyle=gc; ctx.fill();
+      ctx.beginPath(); ctx.arc(7,0,5.5,0,Math.PI*2); ctx.fillStyle=`rgba(255,255,220,${alpha})`; ctx.fill();
     }
 
     ctx.restore();
@@ -3671,13 +4061,14 @@ function updatePlayer(p, dt) {
   if (inp.fire) { if (inVoid) voidShoot(); else tryShoot(); }
 
   const boostMult = p.boosting ? 2.8 : 1;
-  const superMult = p.superMode ? 1.6 : 1;  // 60% faster in super mode
+  const superMult = p.superMode ? 2.2 : 1;                         // star: +120% speed
+  const rapidMult = (rapidFireTimer > 0 && !p.superMode) ? 1.6 : 1; // rapid: +60% speed
 
   if (moving) {
     p.thrustOn = true;
     const len = Math.sqrt(ix*ix + iy*iy);
     const nx = ix / len, ny = iy / len;
-    const acc = p.speed * boostMult * superMult;
+    const acc = p.speed * boostMult * superMult * rapidMult;
     p.vx += nx * acc * dt;
     p.vy += ny * acc * dt;
 
@@ -3688,7 +4079,10 @@ function updatePlayer(p, dt) {
     p.angle += diff * Math.min(1, 9 * dt);
   }
 
-  const maxSpd = p.boosting ? p.maxSpeed * 1.6 : p.maxSpeed;
+  const maxSpd = p.boosting ? p.maxSpeed * 1.6
+    : p.superMode ? p.maxSpeed * 2.2
+    : rapidFireTimer > 0 ? p.maxSpeed * 1.6
+    : p.maxSpeed;
   const spd = Math.sqrt(p.vx*p.vx + p.vy*p.vy);
   if (spd > maxSpd) { p.vx = p.vx/spd*maxSpd; p.vy = p.vy/spd*maxSpd; }
 
@@ -3812,14 +4206,16 @@ function gameLoop(ts) {
     if (inVoid) {
       updateVoid(dt);
       // Void HUD — no boost bar, ammo bar purple
-      document.getElementById('hud-time').textContent = fmtTime(elapsed);
       document.getElementById('hud-score').textContent = Math.floor(score);
-      // In void: boost and ammo are unlimited — show both full in purple
       document.getElementById('boost-hud-slot').style.display = '';
       const boostBarV = document.getElementById('boost-bar');
       boostBarV.style.width = '52px';
       boostBarV.style.background = 'linear-gradient(90deg,#cc44ff,#8800ff)';
       updateHpBar();
+      updatePowerupSidebar();
+      // General timer (bottom-right) keeps ticking
+      const tcV = document.getElementById('hud-timer-corner');
+      if (tcV) tcV.textContent = fmtTime(elapsed);
       const ammoBarV = document.getElementById('ammo-bar');
       ammoBarV.style.width = Math.round(player.ammoCharge * 52) + 'px';
       ammoBarV.style.opacity = player.ammoCharge < 0.12 ? '0.3' : '1';
@@ -3855,18 +4251,47 @@ function gameLoop(ts) {
       if (m.size >= 16) { splitMeteor(m); meteors.splice(idx, 1); }
     }
 
-    // Update meteors (world positions)
+    // Update meteors (world positions + orbital forces from space objects)
     meteors.forEach(m => {
       m.x += m.vx * dt;
       m.y += m.vy * dt;
       m.angle += m.spin * dt;
+
+      // Orbital / swirl force from pulsars and supernovas
+      for (const obj of spaceObjects) {
+        if (obj.type !== 'pulsar' && obj.type !== 'supernova') continue;
+        const dx = obj.wx - m.x, dy = obj.wy - m.y;
+        const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+        const orbitR = obj.type === 'pulsar' ? 260 : 320; // influence radius
+        if (dist > orbitR || dist < 30) continue;
+
+        const t = 1 - dist / orbitR;  // 0 at edge, 1 at center
+
+        // Centripetal pull toward ideal orbit radius (keeps meteors circling)
+        const idealR = orbitR * 0.55;
+        const radialErr = dist - idealR;
+        const radialF = radialErr * 0.015 * t;  // gentle spring toward orbit
+        m.vx += (dx / dist) * radialF * dt * 60;
+        m.vy += (dy / dist) * radialF * dt * 60;
+
+        // Tangential force — perpendicular push (creates rotation)
+        // Direction flips per object index so some orbit CW, some CCW
+        const cw = obj.type === 'pulsar' ? 1 : -1;
+        const tangF = 22 * t;   // gentle tangential nudge
+        m.vx += (-dy / dist) * cw * tangF * dt;
+        m.vy += ( dx / dist) * cw * tangF * dt;
+
+        // Light speed cap so meteors don't fly off
+        const spd = Math.sqrt(m.vx*m.vx + m.vy*m.vy);
+        if (spd > 180) { m.vx = m.vx/spd*180; m.vy = m.vy/spd*180; }
+      }
     });
 
     // Meteor–meteor collisions
     checkMeteorCollisions();
 
-    // Remove meteors far outside viewport (world coords)
-    const margin = 350;
+    // Remove meteors far outside viewport (keep those potentially orbiting nearby objects)
+    const margin = 500;
     meteors = meteors.filter(m =>
       m.x > camera.x - W/2 - margin && m.x < camera.x + W/2 + margin &&
       m.y > camera.y - H/2 - margin && m.y < camera.y + H/2 + margin
@@ -3876,6 +4301,7 @@ function gameLoop(ts) {
     updatePlayer(player, dt);
     updateAliens(dt);
     updateSuperMode(dt);
+    updateShipAbility(dt);
 
     // ── Apply world→screen camera transform for all game objects ──
     ctx.save();
@@ -3890,11 +4316,13 @@ function gameLoop(ts) {
 
     ctx.restore();
 
-    // Meteor-player collision (20 HP = instant kill)
+    // Meteor-player collision
     if (state === 'playing') {
       for (const m of meteors) {
         if (checkCollision(player, m)) {
-          damagePlayer(20);
+          // Small fragments deal 5 HP, large/fast/crystal deal 20 HP (instant kill)
+          const dmg = (m.size < 22 && !m.fast && !m.special) ? 5 : 20;
+          damagePlayer(dmg);
           break;
         }
       }
@@ -3913,7 +4341,6 @@ function gameLoop(ts) {
     }
 
     // HUD
-    document.getElementById('hud-time').textContent = fmtTime(elapsed);
     document.getElementById('hud-score').textContent = Math.floor(score);
     const bar = document.getElementById('boost-bar');
     const pct = Math.round(player.boostCharge * 52);
@@ -3927,6 +4354,11 @@ function gameLoop(ts) {
       ? 'linear-gradient(90deg,#ff4444,#ff0000)'
       : 'linear-gradient(90deg,#00f5ff,#0060ff)';
     updateHpBar();
+    updatePowerupSidebar();
+    const tc = document.getElementById('hud-timer-corner');
+    if (tc) tc.textContent = fmtTime(elapsed);
+    // HUD update
+    document.getElementById('hud-score').textContent = Math.floor(score);
     const bestScore = parseInt(localStorage.getItem('vr_best_score') || '0');
     document.getElementById('hud-best').textContent = bestScore;
 
@@ -3955,12 +4387,23 @@ function showStart() {
   document.getElementById('screen-start').classList.remove('hidden');
   document.getElementById('screen-over').classList.add('hidden');
   document.getElementById('hud').style.display = 'none';
+  document.getElementById('lang-btn').style.display = '';
+  const sc = document.getElementById('score-corner');
+  if (sc) sc.style.display = 'none';
+  const tc = document.getElementById('hud-timer-corner');
+  if (tc) tc.style.display = 'none';
   closeModal();
 }
 
 function showGameOver() {
   document.getElementById('screen-over').classList.remove('hidden');
   document.getElementById('hud').style.display = 'none';
+  const tc = document.getElementById('hud-timer-corner');
+  if (tc) tc.style.display = 'none';
+  const sc2 = document.getElementById('score-corner');
+  if (sc2) sc2.style.display = 'none';
+  const ps = document.getElementById('powerup-sidebar');
+  if (ps) ps.style.display = 'none';
 
   document.getElementById('final-time').textContent = fmtTime(elapsed);
   document.getElementById('final-score').textContent = Math.floor(score);
@@ -4009,7 +4452,6 @@ function renderSkinGrid() {
   const grid = document.getElementById('skin-grid');
   grid.innerHTML = '';
 
-  // Update modal title
   const skTitle = document.querySelector('#modal-skins .modal-title');
   if (skTitle) skTitle.textContent = s.modal_skins_title;
 
@@ -4020,17 +4462,12 @@ function renderSkinGrid() {
     card.style.boxShadow = sk.id === selectedSkin ? `0 0 18px ${sk.accent}40` : '';
 
     const cv = document.createElement('canvas');
-    cv.width = 110; cv.height = 110;
+    cv.width = 90; cv.height = 90;
     const pc = cv.getContext('2d');
-    pc.clearRect(0, 0, 110, 110);
-    const bg = pc.createRadialGradient(55, 55, 0, 55, 55, 55);
-    bg.addColorStop(0, 'rgba(10,25,45,0.9)');
-    bg.addColorStop(1, 'rgba(2,6,14,0)');
-    pc.fillStyle = bg; pc.fillRect(0, 0, 110, 110);
-    pc.save();
-    pc.translate(55, 60);
-    pc.rotate(Math.PI / 2);
-    pc.scale(1.7, 1.7);
+    const bg = pc.createRadialGradient(45,45,0,45,45,45);
+    bg.addColorStop(0,'rgba(10,25,45,0.9)'); bg.addColorStop(1,'rgba(2,6,14,0)');
+    pc.fillStyle=bg; pc.fillRect(0,0,90,90);
+    pc.save(); pc.translate(45,50); pc.rotate(Math.PI/2); pc.scale(1.5,1.5);
     drawShipBody(pc, sk.id, false, false);
     pc.restore();
 
@@ -4043,18 +4480,74 @@ function renderSkinGrid() {
     desc.className = 'skin-desc';
     desc.textContent = s.skin_descs[sk.id] || sk.desc;
 
+    const badge = document.createElement('div');
+    badge.className = 'skin-ability-badge';
+    badge.textContent = '⚡ ' + sk.ability;
+
     card.appendChild(cv);
     card.appendChild(name);
     card.appendChild(desc);
+    card.appendChild(badge);
 
     card.addEventListener('click', () => {
       selectedSkin = sk.id;
       localStorage.setItem('vr_skin', sk.id);
       renderSkinGrid();
+      renderShipDetail(sk.id);
     });
 
     grid.appendChild(card);
   });
+
+  // Show detail for currently selected skin
+  renderShipDetail(selectedSkin);
+}
+
+function renderShipDetail(id) {
+  const det = document.getElementById('ship-detail');
+  if (!det) return;
+  const sk = SKINS[id];
+  const st = SHIP_STATS[id];
+  const lang = currentLang;
+
+  // Speed bar: 215–403 range → 0–100%
+  const speedPct  = Math.round(((st.speed - 200) / 220) * 100);
+  const bspeedPct = Math.round(((st.bulletSpeed - 600) / 700) * 100);
+  const coolPct   = Math.round((1 - (st.cooldown - 0.08) / 0.45) * 100); // lower cooldown = better
+  const sizeLabels = { S:'PICCOLI', M:'MEDI', L:'GRANDI', XL:'ENORMI' };
+  const sizeLabelEn = { S:'SMALL', M:'MEDIUM', L:'LARGE', XL:'HUGE' };
+  const sizeLabel = lang === 'it' ? (sizeLabels[st.bulletSize]||'MEDI') : (sizeLabelEn[st.bulletSize]||'MEDIUM');
+
+  const bar = (pct, col) =>
+    `<div class="stat-bar-wrap">
+       <div class="stat-bar" style="width:${pct}px;background:${col};"></div>
+       <div class="stat-val" style="color:${col};">${pct}%</div>
+     </div>`;
+
+  const speedLabel = lang==='it' ? 'VELOCITÀ NAVE' : 'SHIP SPEED';
+  const bspLabel   = lang==='it' ? 'VELOCITÀ COLPI' : 'BULLET SPEED';
+  const sizeL      = lang==='it' ? 'DIMENSIONE COLPI' : 'BULLET SIZE';
+  const abilityL   = lang==='it' ? 'ABILITÀ SPECIALE' : 'SPECIAL ABILITY';
+
+  det.style.display = 'block';
+  det.innerHTML = `
+    <div class="stat-row">
+      <span class="stat-label">${speedLabel}</span>
+      ${bar(speedPct, sk.accent)}
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">${bspLabel}</span>
+      ${bar(bspeedPct, sk.accent)}
+    </div>
+    <div class="stat-row">
+      <span class="stat-label">${sizeL}</span>
+      <span class="stat-val" style="color:${sk.accent};">${sizeLabel}</span>
+    </div>
+    <div class="ability-box">
+      <div class="ability-title">⚡ ${abilityL}: ${sk.ability}</div>
+      <div class="ability-desc">${sk.abilityDesc}</div>
+    </div>
+  `;
 }
 
 function closeModal() {
@@ -4093,16 +4586,16 @@ function saveScore() {
   const bestScore = parseInt(localStorage.getItem('vr_best_score') || '0');
   if (finalScore > bestScore) localStorage.setItem('vr_best_score', finalScore);
 
+  // Push new score; saveScores handles deduplication (keeps best per name)
   const scores = getScores();
   scores.push({ name, score: finalScore, time: elapsed });
-  scores.sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-  saveScores(scores.slice(0, 20));
+  saveScores(scores); // dedup + sort inside saveScores
 
   renderLeaderboard();
   const btn = document.querySelector('#screen-over .btn-sm');
   btn.textContent = '✓ SALVATO';
   btn.style.background = '#00c853';
-  setTimeout(() => { btn.textContent = 'SALVA'; btn.style.background = ''; }, 2000);
+  setTimeout(() => { btn.textContent = STRINGS[currentLang].btn_save || 'SALVA'; btn.style.background = ''; }, 2000);
 }
 
 // ─── START GAME ──────────────────────────────────────────────────
@@ -4110,6 +4603,10 @@ function startGame() {
   document.getElementById('screen-start').classList.add('hidden');
   document.getElementById('screen-over').classList.add('hidden');
   document.getElementById('hud').style.display = 'flex';
+  document.getElementById('score-corner').style.display = 'block';
+  document.getElementById('hud-timer-corner').style.display = 'block';
+  document.getElementById('lang-btn').style.display = 'none';
+  document.getElementById('powerup-sidebar').style.display = 'none';
   updateHpBar();
 
   elapsed = 0;
@@ -4130,10 +4627,13 @@ function startGame() {
   powerUps = [];
   rapidFireTimer = 0;
   shieldTimer = 0;
+  shipAbilityTimer = 0;
+  if (player) player._novaTimer = 0;
   inVoid = false;
   voidMeteors = []; voidBullets = []; voidParticles = []; voidTurrets = []; voidTurretBullets = [];
   voidWorldObjects = [];
   voidTransition = { active: false, t: 0, duration: 2.8 };
+  voidExitTransition = { active: false, t: 0, duration: 2.6 };
   initWorld();
 
   // Initial meteors
