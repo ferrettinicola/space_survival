@@ -305,6 +305,12 @@
     98% { opacity:1; }
   }
 
+  #screen-start {
+    background: radial-gradient(ellipse at center, rgba(0,10,30,0.35) 0%, rgba(2,5,12,0.55) 100%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+
   .logo { animation: flicker 8s infinite; }
 
   /* ──── MODAL ──── */
@@ -518,7 +524,7 @@
 
     <!-- Instructions panel -->
     <div id="modal-instructions" class="hidden">
-      <div class="modal-title" data-i="modal_controls">CONTROLLI</div>
+      <div class="modal-title" id="instr-modal-title" data-i="modal_instr_title">ISTRUZIONI</div>
 
       <!-- Tab switcher -->
       <div style="display:flex;gap:10px;margin-bottom:16px;">
@@ -556,7 +562,8 @@
           <tr><td data-i="sc_time">⏱ Ogni secondo sopravvissuto</td><td>+1 pt</td></tr>
           <tr><td data-i="sc_normal">🪨 Meteora normale colpita</td><td>+3 pt</td></tr>
           <tr><td data-i="sc_fast">🔴 Meteora rossa (veloce)</td><td>+5 pt</td></tr>
-          <tr><td data-i="sc_crystal">💎 Meteora cristallo</td><td>+7 pt</td></tr>
+          <tr><td data-i="sc_crystal">💎 Meteora cristallo (+ frammenti)</td><td>+7 pt</td></tr>
+          <tr><td data-i="sc_void">🌑 Meteora nel secondo mondo</td><td>+10 pt</td></tr>
           <tr><td data-i="sc_alien">👾 Navicella aliena (Scout/Caotico/Bomber)</td><td>+20 pt</td></tr>
           <tr><td data-i="sc_dread">🛡 Dreadnought alieno (5 HP)</td><td>+50 pt</td></tr>
         </table>
@@ -1065,6 +1072,9 @@ const STRINGS = {
     name_placeholder:'Il tuo nome...',
     modal_controls:'CONTROLLI',
     modal_skins_title:'SCEGLI LA TUA NAVE',
+    modal_instr_title:'ISTRUZIONI',
+    modal_controls_title:'CONTROLLI',
+    modal_score_title:'PUNTEGGIO',
     tab_controls:'🎮 CONTROLLI', tab_score:'⭐ PUNTEGGIO',
     instr_move:'Muovi la navicella nello spazio',
     instr_boost:'Boost — accelerazione rapida (la barra gialla si svuota e si ricarica)',
@@ -1074,7 +1084,8 @@ const STRINGS = {
     sc_time:'⏱ Ogni secondo sopravvissuto',
     sc_normal:'🪨 Meteora normale colpita',
     sc_fast:'🔴 Meteora rossa (veloce)',
-    sc_crystal:'💎 Meteora cristallo',
+    sc_crystal:'💎 Meteora cristallo (+ frammenti)',
+    sc_void:'🌑 Meteora nel secondo mondo',
     sc_alien:'👾 Navicella aliena (Scout/Caotico/Bomber)',
     sc_dread:'🛡 Dreadnought alieno (5 HP)',
     record_badge:'★ NUOVO RECORD PERSONALE!',
@@ -1095,6 +1106,9 @@ const STRINGS = {
     name_placeholder:'Your name...',
     modal_controls:'CONTROLS',
     modal_skins_title:'CHOOSE YOUR SHIP',
+    modal_instr_title:'INSTRUCTIONS',
+    modal_controls_title:'CONTROLS',
+    modal_score_title:'SCORING',
     tab_controls:'🎮 CONTROLS', tab_score:'⭐ SCORING',
     instr_move:'Move the ship through space',
     instr_boost:'Boost — quick acceleration (yellow bar drains and recharges)',
@@ -1104,7 +1118,8 @@ const STRINGS = {
     sc_time:'⏱ Each second survived',
     sc_normal:'🪨 Normal meteor hit',
     sc_fast:'🔴 Red meteor (fast)',
-    sc_crystal:'💎 Crystal meteor',
+    sc_crystal:'💎 Crystal meteor (+ fragments)',
+    sc_void:'🌑 Meteor in the void world',
     sc_alien:'👾 Alien ship (Scout/Chaotic/Bomber)',
     sc_dread:'🛡 Alien Dreadnought (5 HP)',
     record_badge:'★ NEW PERSONAL RECORD!',
@@ -1155,6 +1170,9 @@ function showInstrTab(tab) {
   document.getElementById('tab-score').classList.toggle('hidden', tab !== 'score');
   document.getElementById('tab-controls-btn').style.borderColor = tab==='controls' ? 'var(--cyan)' : '';
   document.getElementById('tab-score-btn').style.borderColor = tab==='score' ? 'var(--cyan)' : '';
+  const s = STRINGS[currentLang];
+  const titleEl = document.getElementById('instr-modal-title');
+  if (titleEl) titleEl.textContent = tab === 'controls' ? s.modal_controls_title : s.modal_score_title;
 }
 
 // ─── LOCALSTORAGE ────────────────────────────────────────────────
@@ -1496,10 +1514,43 @@ function spawnMeteor(forceFast) {
 }
 
 function splitMeteor(m, impactX, impactY) {
-  const count = Math.floor(Math.random() * 2 + 2);
-  const childSize = m.size * 0.48;
   const cx = impactX !== undefined ? impactX : m.x;
   const cy = impactY !== undefined ? impactY : m.y;
+
+  // Crystal meteors shatter into 3 fast special shards
+  if (m.special) {
+    const shardCount = 3;
+    for (let i = 0; i < shardCount; i++) {
+      const angle = (i / shardCount) * Math.PI * 2 + Math.random() * 0.4;
+      const speed = 110 + Math.random() * 90;
+      const childSize = m.size * 0.42;
+      if (childSize >= 8) {
+        const shard = makeMeteor(childSize, m.x, m.y,
+          m.vx * 0.3 + Math.cos(angle) * speed,
+          m.vy * 0.3 + Math.sin(angle) * speed,
+          false, true   // stays special so it gives 7pts and looks crystal
+        );
+        meteors.push(shard);
+      }
+    }
+    // Crystal shatter flash — bright cyan/white
+    particles.push({ x:cx, y:cy, vx:0, vy:0, life:1, maxLife:0.20, size:m.size*1.6, color:'#80eeff', isRing:true });
+    particles.push({ x:cx, y:cy, vx:0, vy:0, life:1, maxLife:0.12, size:m.size*0.9, color:'#ffffff', isRing:true });
+    for (let i=0; i<20; i++) {
+      const a=Math.random()*Math.PI*2, sp=100+Math.random()*250;
+      particles.push({ x:cx, y:cy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+        life:1, maxLife:Math.random()*0.5+0.2, size:Math.random()*4+1, color:'#a0f0ff' });
+    }
+    for (let i=0; i<12; i++) {
+      const a=Math.random()*Math.PI*2, sp=300+Math.random()*300;
+      particles.push({ x:cx, y:cy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+        life:1, maxLife:0.15+Math.random()*0.1, size:1+Math.random()*2, color:'#ffffff' });
+    }
+    return;
+  }
+
+  const count = Math.floor(Math.random() * 2 + 2);
+  const childSize = m.size * 0.48;
 
   if (childSize >= 8) {
     for (let i = 0; i < count; i++) {
@@ -2732,7 +2783,7 @@ function updateVoid(dt) {
         voidExplosion(b.x, b.y);
         splitMeteor(m, b.x, b.y);
         voidMeteors.splice(i, 1);
-        score += 4;
+        score += 10;  // void world bonus
         return false;
       }
     }
@@ -3068,16 +3119,35 @@ function updatePlayer(p, dt) {
     const {x: bx, y: by} = wrapAdjust(bh.wx, bh.wy);
     const dx = bx - p.x, dy = by - p.y;
     const dist = Math.sqrt(dx*dx + dy*dy) || 1;
-    const pullRadius = bh.r * 18;
+    const pullRadius = bh.r * 24;
     if (dist < pullRadius) {
       const t = 1 - (dist / pullRadius);
-      const strength = 15 + 280 * t * t;  // very gentle: max ~295 at edge
+      const strength = 12 + 900 * t * t * t; // cubic: barely noticeable far, strong close
       p.vx += (dx/dist) * strength * dt;
       p.vy += (dy/dist) * strength * dt;
-      // Instant kill at event horizon
       if (dist < bh.r * 1.05) {
         enterVoid(bh);
         return;
+      }
+    }
+  }
+
+  // ── Black hole attraction on meteors ──
+  if (!inVoid) {
+    for (const bh of blackHoles) {
+      const {x: bx, y: by} = wrapAdjust(bh.wx, bh.wy);
+      const mPullR = bh.r * 20;
+      for (const m of meteors) {
+        const mdx = bx - m.x, mdy = by - m.y;
+        const mdist = Math.sqrt(mdx*mdx + mdy*mdy) || 1;
+        if (mdist < mPullR) {
+          const mt = 1 - (mdist / mPullR);
+          // Smaller meteors feel more pull (mass effect: inversely proportional to size)
+          const sizeFactor = Math.max(0.3, 25 / m.size);
+          const str = (8 + 180 * mt * mt) * sizeFactor;
+          m.vx += (mdx/mdist) * str * dt;
+          m.vy += (mdy/mdist) * str * dt;
+        }
       }
     }
   }
@@ -3184,6 +3254,44 @@ function gameLoop(ts) {
   if (player && state === 'playing') {
     camera.x += (player.x - camera.x) * Math.min(1, 12 * dt);
     camera.y += (player.y - camera.y) * Math.min(1, 12 * dt);
+  } else if (state === 'start' || state === 'dead') {
+    // Gentle drift on start/game-over screen so stars animate
+    camera.x += 18 * dt;
+    camera.y += 8 * dt;
+    // Also draw some slow decorative meteors on start screen
+    if (state === 'start') {
+      if (!window._deco) {
+        window._deco = Array.from({length: 8}, () => {
+          const s = Math.random()*35+15;
+          return makeMeteor(s,
+            Math.random()*W, Math.random()*H,
+            (Math.random()-0.5)*22, (Math.random()-0.5)*22,
+            false, false
+          );
+        });
+      }
+      window._deco.forEach(m => {
+        m.x += m.vx * dt; m.y += m.vy * dt; m.angle += m.spin * dt;
+        // Wrap screen
+        if (m.x < -80) m.x = W+80; if (m.x > W+80) m.x = -80;
+        if (m.y < -80) m.y = H+80; if (m.y > H+80) m.y = -80;
+        // Draw with no wrapAdjust needed (screen space)
+        const wx = m.x, wy = m.y;
+        ctx.save(); ctx.translate(wx, wy); ctx.rotate(m.angle);
+        // Simple faint rock shape
+        ctx.beginPath();
+        m.shape.forEach((p,i) => {
+          if(i===0) ctx.moveTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
+          else ctx.lineTo(Math.cos(p.a)*p.r, Math.sin(p.a)*p.r);
+        });
+        ctx.closePath();
+        ctx.fillStyle='rgba(50,30,15,0.55)'; ctx.fill();
+        ctx.strokeStyle='rgba(120,80,40,0.3)'; ctx.lineWidth=1; ctx.stroke();
+        ctx.restore();
+      });
+    } else {
+      window._deco = null; // reset when leaving start screen
+    }
   }
 
   // Dynamic background (changes color as you explore)
@@ -3368,6 +3476,7 @@ function openModal(which) {
   document.getElementById('modal-' + which).classList.remove('hidden');
   if (which === 'leaderboard') renderLeaderboardModal();
   if (which === 'skins') renderSkinGrid();
+  if (which === 'instructions') showInstrTab('controls');
 }
 
 function renderSkinGrid() {
