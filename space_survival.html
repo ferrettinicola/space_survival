@@ -1666,7 +1666,8 @@ function drawMeteor(m) {
 function drawParticles(dt) {
   particles = particles.filter(p => {
     p.x += p.vx * dt; p.y += p.vy * dt;
-    p.vx *= 0.96; p.vy *= 0.96;
+    p.vx *= p.isShipShard ? 0.985 : 0.96;
+    p.vy *= p.isShipShard ? 0.985 : 0.96;
     p.life -= dt / (p.maxLife || 0.6);
     if (p.life <= 0) return false;
 
@@ -1684,6 +1685,34 @@ function drawParticles(dt) {
       const sz = p.size * p.life;
       ctx.fillStyle = p.color + Math.floor(p.life * 220).toString(16).padStart(2,'0');
       ctx.fillRect(-sz/2, -sz/2, sz, sz * 0.7);
+      ctx.restore();
+
+    } else if (p.isShipShard) {
+      // Real ship piece — polygon that spins and fades
+      p.spin += p.spinSpeed * dt;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.spin);
+      ctx.scale(p.life, p.life);          // shrinks as it fades
+      const alpha = p.life * p.life;      // quadratic fade so it's bright at start
+      // Draw the polygon shape
+      ctx.beginPath();
+      p.pts.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
+      ctx.closePath();
+      ctx.fillStyle = p.color + Math.floor(alpha * 200).toString(16).padStart(2,'0');
+      ctx.fill();
+      // Bright lit edge
+      ctx.strokeStyle = p.edgeColor + Math.floor(alpha * 255).toString(16).padStart(2,'0');
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      // Small inner glow
+      if (alpha > 0.3) {
+        ctx.beginPath();
+        p.pts.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px*0.4, py*0.4) : ctx.lineTo(px*0.4, py*0.4));
+        ctx.closePath();
+        ctx.fillStyle = '#ffffff' + Math.floor(alpha * 80).toString(16).padStart(2,'0');
+        ctx.fill();
+      }
       ctx.restore();
     } else {
       ctx.beginPath();
@@ -1739,59 +1768,136 @@ function checkMeteorCollisions() {
 
 // ─── DEATH EFFECT ────────────────────────────────────────────────
 function spawnDeathExplosion(x, y) {
-  const skinAccent = SKINS[selectedSkin]?.accent || '#00f5ff';
+  const sk = SKINS[selectedSkin] || SKINS[0];
+  const accent = sk.accent;
+  const dark   = sk.dark;
 
-  // Shockwave rings (3 expanding)
-  [0.18, 0.32, 0.50].forEach(ml => {
-    particles.push({ x, y, vx:0, vy:0, life:1, maxLife:ml,
-      size: 80 + ml*200, color: skinAccent, isRing:true });
+  // ── 1. SHIP SHARDS — actual geometric pieces of the ship ──
+  // Pre-defined pieces based on ship silhouette (in local coords, pre-scaled)
+  const scale = 18; // match ingame ship visual size (0.83 × ship coords)
+  const shipPieces = [
+    // Nose tip
+    { pts: [[0,-20],[4,-8],[-4,-8]],          fill: dark,   edge: accent },
+    // Left fuselage panel
+    { pts: [[-4,-8],[-8,6],[0,12],[4,-2]],    fill: dark,   edge: accent },
+    // Right fuselage panel
+    { pts: [[4,-8],[8,6],[0,12],[-4,-2]],     fill: dark,   edge: accent },
+    // Left wing
+    { pts: [[-6,4],[-16,14],[-10,6]],         fill: dark,   edge: accent },
+    // Right wing
+    { pts: [[6,4],[16,14],[10,6]],            fill: dark,   edge: accent },
+    // Engine section left
+    { pts: [[-10,6],[-6,14],[0,12]],          fill: dark,   edge: '#ff8c00' },
+    // Engine section right
+    { pts: [[10,6],[6,14],[0,12]],            fill: dark,   edge: '#ff8c00' },
+    // Cockpit shard
+    { pts: [[-3,-13],[3,-13],[2,-3],[-2,-3]], fill: accent+'88', edge: '#ffffff' },
+    // Extra hull fragments (small)
+    { pts: [[-2,0],[2,0],[1,8],[-1,8]],       fill: dark,   edge: accent },
+    { pts: [[-12,10],[-8,14],[-14,16]],       fill: dark,   edge: accent+'99' },
+    { pts: [[12,10],[8,14],[14,16]],          fill: dark,   edge: accent+'99' },
+  ];
+
+  shipPieces.forEach(piece => {
+    // Scale and offset points
+    const pts = piece.pts.map(([px, py]) => [px * scale * 0.083, py * scale * 0.083]);
+    const cx = pts.reduce((s,[px])=>s+px,0)/pts.length;
+    const cy = pts.reduce((s,[,py])=>s+py,0)/pts.length;
+
+    // Explosion velocity — radially outward from centroid + random
+    const baseAngle = Math.atan2(cy, cx);
+    const spread = (Math.random()-0.5) * 1.2;
+    const speed = 180 + Math.random() * 420;
+    const ang = baseAngle + spread;
+
+    particles.push({
+      x, y,
+      vx: Math.cos(ang) * speed,
+      vy: Math.sin(ang) * speed,
+      life: 1,
+      maxLife: 1.4 + Math.random() * 1.0,
+      size: 1,  // unused, kept for filter
+      color: piece.fill,
+      edgeColor: piece.edge,
+      pts,
+      spin: (Math.random()-0.5) * Math.PI * 1.5,  // initial rotation (world-space angle)
+      spinSpeed: (Math.random()-0.5) * 8,          // rad/s
+      isShipShard: true,
+    });
   });
 
-  // Central flash (big bright circle)
-  particles.push({ x, y, vx:0, vy:0, life:1, maxLife:0.12,
-    size: 55, color:'#ffffff', isRing:true });
+  // ── 2. SHOCKWAVE RINGS — 5 expanding rings ──
+  [0.10, 0.20, 0.35, 0.52, 0.72].forEach((ml, i) => {
+    particles.push({ x, y, vx:0, vy:0, life:1, maxLife:ml,
+      size: 40 + i*90, color: i < 2 ? '#ffffff' : accent, isRing:true });
+  });
 
-  // Hull debris — large coloured chunks
-  for (let i = 0; i < 18; i++) {
-    const a = Math.random()*Math.PI*2, sp = Math.random()*280+80;
+  // ── 3. BLINDING FLASH ──
+  particles.push({ x, y, vx:0, vy:0, life:1, maxLife:0.08,
+    size: 120, color:'#ffffff', isRing:true });
+
+  // ── 4. FIREBALL — big orange/red expanding ball ──
+  for (let i = 0; i < 5; i++) {
+    const a = (i/5)*Math.PI*2, sp = 30+Math.random()*60;
     particles.push({ x, y,
       vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
-      life:1, maxLife: Math.random()*1.4+0.5,
-      size: Math.random()*10+4,
-      color: [skinAccent, '#ff6b35', '#ffd700', '#ffffff'][Math.floor(Math.random()*4)],
-      isDebris: true });
+      life:1, maxLife: 0.35+Math.random()*0.2,
+      size: 28+Math.random()*20,
+      color: i%2===0 ? '#ff6600' : '#ff3300' });
   }
 
-  // Fire particles — medium, hot
-  for (let i = 0; i < 50; i++) {
-    const a = Math.random()*Math.PI*2, sp = Math.random()*380+60;
-    const hot = Math.random() > 0.5;
+  // ── 5. FIRE STREAKS ──
+  for (let i = 0; i < 80; i++) {
+    const a = Math.random()*Math.PI*2, sp = 80+Math.random()*600;
     particles.push({ x, y,
       vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
-      life:1, maxLife: Math.random()*0.9+0.3,
-      size: Math.random()*7+2,
-      color: hot ? '#ff8c00' : '#ff3300' });
+      life:1, maxLife: 0.25+Math.random()*0.7,
+      size: 2+Math.random()*6,
+      color: Math.random()>0.5 ? '#ff9900' : '#ff4400' });
   }
 
-  // Sparks — fast, tiny
-  for (let i = 0; i < 40; i++) {
-    const a = Math.random()*Math.PI*2, sp = Math.random()*600+150;
+  // ── 6. SPARKS — ultra-fast tiny streaks ──
+  for (let i = 0; i < 80; i++) {
+    const a = Math.random()*Math.PI*2, sp = 400+Math.random()*900;
     particles.push({ x, y,
       vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
-      life:1, maxLife: Math.random()*0.4+0.1,
-      size: Math.random()*2.5+0.5,
-      color: Math.random()>0.4 ? '#ffee44' : skinAccent });
+      life:1, maxLife: 0.08+Math.random()*0.25,
+      size: 1+Math.random()*2,
+      color: Math.random()>0.4 ? '#ffee44' : accent });
   }
 
-  // Smoke puffs — slow, large, dark
-  for (let i = 0; i < 15; i++) {
-    const a = Math.random()*Math.PI*2, sp = Math.random()*80+20;
+  // ── 7. ENGINE CORE — cyan/accent burst ──
+  for (let i = 0; i < 30; i++) {
+    const a = Math.random()*Math.PI*2, sp = 200+Math.random()*500;
     particles.push({ x, y,
       vx: Math.cos(a)*sp, vy: Math.sin(a)*sp,
-      life:1, maxLife: Math.random()*1.8+0.8,
-      size: Math.random()*18+8,
-      color: '#222233' });
+      life:1, maxLife: 0.3+Math.random()*0.5,
+      size: 2+Math.random()*5,
+      color: accent });
   }
+
+  // ── 8. SMOKE PUFFS — slow, large, linger ──
+  for (let i = 0; i < 20; i++) {
+    const a = Math.random()*Math.PI*2, sp = 20+Math.random()*90;
+    particles.push({ x, y,
+      vx: Math.cos(a)*sp, vy: Math.sin(a)*sp - 15,
+      life:1, maxLife: 1.5+Math.random()*1.5,
+      size: 16+Math.random()*28,
+      color: '#1a1a2e' });
+  }
+
+  // ── 9. SECONDARY EXPLOSION (delayed) — small afterblast ──
+  setTimeout(() => {
+    if (state !== 'dead') return;
+    const ox = x+(Math.random()-0.5)*60, oy = y+(Math.random()-0.5)*60;
+    particles.push({ x:ox, y:oy, vx:0, vy:0, life:1, maxLife:0.18,
+      size: 60, color:'#ff8800', isRing:true });
+    for (let i=0; i<30; i++) {
+      const a=Math.random()*Math.PI*2, sp=60+Math.random()*300;
+      particles.push({ x:ox, y:oy, vx:Math.cos(a)*sp, vy:Math.sin(a)*sp,
+        life:1, maxLife:0.3+Math.random()*0.5, size:2+Math.random()*5, color:'#ff6600' });
+    }
+  }, 350);
 }
 
 // ─── ALIEN SHIPS ─────────────────────────────────────────────────
@@ -2027,7 +2133,7 @@ function updateAndDrawAlienBullets(dt) {
     const dx = b.x - player.x, dy = b.y - player.y;
     if (Math.sqrt(dx*dx+dy*dy) < player.radius + 5) {
       spawnDeathExplosion(player.x, player.y);
-      state = 'dead'; setTimeout(showGameOver, 1400);
+      state = 'dead'; setTimeout(showGameOver, 2200);
       return false;
     }
 
@@ -2353,7 +2459,7 @@ function updatePlayer(p, dt) {
       // Instant kill at event horizon
       if (dist < bh.r * 1.05) {
         spawnDeathExplosion(p.x, p.y);
-        state = 'dead'; setTimeout(showGameOver, 1400); return;
+        state = 'dead'; setTimeout(showGameOver, 2200); return;
       }
     }
   }
@@ -2522,7 +2628,7 @@ function gameLoop(ts) {
       if (checkCollision(player, m)) {
         spawnDeathExplosion(player.x, player.y);
         state = 'dead';
-        setTimeout(showGameOver, 1400);
+        setTimeout(showGameOver, 2200);
         break;
       }
     }
