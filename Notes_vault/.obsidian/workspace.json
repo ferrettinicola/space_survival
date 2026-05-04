@@ -11,14 +11,10 @@
             "id": "7d2301237dbeacfb",
             "type": "leaf",
             "state": {
-              "type": "markdown",
-              "state": {
-                "file": "In comune/🏠 HOME.md",
-                "mode": "source",
-                "source": false
-              },
+              "type": "empty",
+              "state": {},
               "icon": "lucide-file",
-              "title": "🏠 HOME"
+              "title": "New tab"
             }
           }
         ]
@@ -183,8 +179,13 @@
       "bases:Create new base": false
     }
   },
-  "active": "df2d26cda80ac2a1",
+  "active": "7d2301237dbeacfb",
   "lastOpenFiles": [
+    "Untitled.base",
+    "Untitled.canvas",
+    "2026-05-04.md",
+    "Untitled 1.canvas",
+    "Mondo Principale/1. Mondo Principale.md",
     "In comune/🏠 HOME.md",
     "Untitled.md",
     "In comune",
@@ -196,9 +197,7 @@
     "Mondo Principale/3. La Navicella.md",
     "Mondo Principale/2. Elementi del Mondo.md",
     "Secondo Mondo/1. Secondo Mondo.md",
-    "Mondo Principale/1. Mondo Principale.md",
     "In comune/Punteggio e HUD.md",
-    "Untitled.base",
     "SPACE_RACE_context.md",
     "Secondo Mondo",
     "Mondo Principale"
