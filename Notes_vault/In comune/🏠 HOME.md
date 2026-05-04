@@ -14,25 +14,25 @@ tags: [index, space-race]
 
 | Mondo | Descrizione | Accesso |
 |---|---|---|
-| [[Mondo Principale]] | Mondo di partenza, toroidale 20k×20k | Spawn diretto |
-| [[Secondo Mondo]] | Void Dimension, 45 secondi, 1.875× velocità | Entrare in un [[Elementi del Mondo#Buchi Neri\|Buco Nero]] |
+| [[1. Mondo Principale]] | Mondo di partenza, toroidale 20k×20k | Spawn diretto |
+| [[1. Secondo Mondo]] | Void Dimension, 45 secondi, 1.875× velocità | Entrare in un [[2. Elementi del Mondo#Buchi Neri\|Buco Nero]] |
 
 ---
 
 ## 📂 Note Principali
 
 ### 🌌 Mondo Principale
-- [[Mondo Principale]] — Overview e fisica
-- [[Elementi del Mondo]] — Pianeti, nebulose, galassie, buchi neri
-- [[La Navicella]] — Le 4 navi, controlli, statistiche
-- [[Meteoriti]] — Tipi, comportamento, danni
-- [[Alieni]] — 4 tipi, AI, drop
-- [[Power-Up]] — Star Power, Scudo, Fuoco Rapido, HP
+- [[1. Mondo Principale]] — Overview e fisica
+- [[2. Elementi del Mondo]] — Pianeti, nebulose, galassie, buchi neri
+- [[3. La Navicella]] — Le 4 navi, controlli, statistiche
+- [[4. Meteoriti]] — Tipi, comportamento, danni
+- [[5. Alieni]] — 4 tipi, AI, drop
+- [[6. Power-Up]] — Star Power, Scudo, Fuoco Rapido, HP
 
 ### 🌑 Secondo Mondo
-- [[Secondo Mondo]] — Overview, regole, fisica
-- [[Nemici del Void]] — Meteoriti void + Torrette
-- [[Transizioni]] — Entrata e uscita dal buco nero
+- [[1. Secondo Mondo]] — Overview, regole, fisica
+- [[3. Nemici del Void]] — Meteoriti void + Torrette
+- [[2. Transizioni]] — Entrata e uscita dal buco nero
 
 ---
 

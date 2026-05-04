@@ -13,12 +13,12 @@
             "state": {
               "type": "markdown",
               "state": {
-                "file": "Mondo Principale/La Navicella.md",
+                "file": "In comune/🏠 HOME.md",
                 "mode": "source",
                 "source": false
               },
               "icon": "lucide-file",
-              "title": "La Navicella"
+              "title": "🏠 HOME"
             }
           }
         ]
@@ -183,22 +183,24 @@
       "bases:Create new base": false
     }
   },
-  "active": "7d2301237dbeacfb",
+  "active": "df2d26cda80ac2a1",
   "lastOpenFiles": [
-    "Mondo Principale/Elementi del Mondo.md",
-    "Mondo Principale/Alieni.md",
-    "🏠 HOME.md",
-    "Punteggio e HUD.md",
+    "In comune/🏠 HOME.md",
+    "Untitled.md",
+    "In comune",
+    "Secondo Mondo/3. Nemici del Void.md",
+    "Secondo Mondo/2. Transizioni.md",
+    "Mondo Principale/6. Power-Up.md",
+    "Mondo Principale/5. Alieni.md",
+    "Mondo Principale/4. Meteoriti.md",
+    "Mondo Principale/3. La Navicella.md",
+    "Mondo Principale/2. Elementi del Mondo.md",
+    "Secondo Mondo/1. Secondo Mondo.md",
+    "Mondo Principale/1. Mondo Principale.md",
+    "In comune/Punteggio e HUD.md",
     "Untitled.base",
     "SPACE_RACE_context.md",
-    "Mondo Principale/La Navicella.md",
-    "Mondo Principale/Power-Up.md",
-    "Mondo Principale/Mondo Principale.md",
-    "Secondo Mondo/Transizioni.md",
-    "Secondo Mondo/Secondo Mondo.md",
-    "Secondo Mondo/Nemici del Void.md",
     "Secondo Mondo",
-    "Mondo Principale/Meteoriti.md",
     "Mondo Principale"
   ]
 }
