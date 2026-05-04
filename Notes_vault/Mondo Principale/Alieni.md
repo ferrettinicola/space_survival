@@ -1,0 +1,123 @@
+---
+type: reference
+tags: [alieni, nemici, mondo-principale, gameplay]
+---
+
+# 👾 Alieni
+
+> [!info]
+> Nemici attivi del [[Mondo Principale]]. Seguono pattern di orbita ellittica attorno alla navicella e sparano proiettili laser. Alla distruzione lasciano cadere [[Power-Up]].
+
+
+---
+
+## Spawn
+
+| Parametro | Valore |
+|---|---|
+| Frequenza | Ogni **10 secondi** |
+| Delay iniziale | Primo spawn dopo 8s di gioco |
+| Max contemporanei | **8** |
+| Posizione spawn | 50% vicino alla camera, 50% casuale nel mondo |
+| Dopo 60s | 35% probabilità di **doppio spawn** per ciclo |
+
+---
+
+## Comportamento Generale (AI)
+
+Tutti gli alieni seguono un'**orbita ellittica** con:
+- Centro dell'ellisse che **deriva lentamente verso il giocatore**
+- Velocità orbitale con **burst imprevedibili** (modulati da sin)
+- Proiettili laser di colore diverso per ogni tipo
+
+**Danno contatto**: 5 HP
+**Danno laser**: 5 HP
+
+---
+
+## Tipi di Alieno
+
+### 🟢 Scout
+| Parametro | Valore |
+|---|---|
+| Colore | Verde |
+| HP | 3 |
+| Frequenza spawn | **46%** |
+| Attacco | 1 colpo mirato ogni 3,5–7,5s |
+| Punti | **+20** |
+| Drop | ❤️ **+10 HP** (istantaneo) |
+
+Il nemico più comune. Tiro preciso ma lento. Drop prezioso quando HP è basso.
+
+---
+
+### 🔴 Caotico
+| Parametro | Valore |
+|---|---|
+| Colore | Rosso con punte |
+| HP | 3 |
+| Frequenza spawn | **26%** |
+| Attacco | 3–5 colpi random ogni 0,8–2,3s |
+| Punti | **+20** |
+| Drop | ⚡ **Rapid Fire 30s** |
+
+> [!warning]
+> Spara raffiche in direzioni semi-casuali — può colpire da angoli inaspettati. Pericoloso in spazi affollati.
+
+---
+
+### 🟣 Bombardiere
+| Parametro | Valore |
+|---|---|
+| Colore | Viola esagonale |
+| HP | 3 |
+| Frequenza spawn | **18%** |
+| Attacco | Lancia [[Meteoriti#💣 Meteorite del Bombardiere\|meteore-bomba]] ogni 4–7s |
+| Punti | **+20** |
+| Drop | 🛡 **Scudo 30s** |
+
+> [!warning]
+> Le meteore-bomba seguono traiettorie balistiche e si aggiungono al caos dei meteoriti normali. Priorità media-alta.
+
+---
+
+### 🟡 Dreadnought
+| Parametro | Valore |
+|---|---|
+| Colore | Oro con armatura |
+| HP | **5** |
+| Frequenza spawn | **10%** |
+| Attacco | Tripla salva ogni 4–7s |
+| Orbita | Più lenta degli altri |
+| HP barre | Nascoste (non visibili nell'HUD nemico) |
+| Punti | **+50** |
+| Drop | ⭐ **Star Power 45s** + 🔥 **Abilità Nave 12s** |
+
+> [!danger] Priorità massima
+> Il nemico più resistente e con il drop più potente. Vale la pena concentrarsi per abbatterlo appena appare — Star Power è il power-up più forte del gioco.
+
+---
+
+## Riepilogo Drop
+
+| Alieno | Drop | Effetto |
+|---|---|---|
+| Scout | ❤️ Croce verde | +10 HP istantanei |
+| Caotico | ⚡ Fulmine arancio | Rapid Fire 30s |
+| Bombardiere | 🛡 Esagono viola | Scudo 30s |
+| Dreadnought | ⭐ + 🔥 | Star Power 45s + Abilità nave 12s |
+
+→ Vedi [[Power-Up]] per i dettagli su ogni effetto.
+
+I power-up **fluttuano** nel punto di morte per **25 secondi**, poi scompaiono.
+
+---
+
+## Note per Sviluppi Futuri
+
+> [!todo] Idee
+> - [ ] Alieno medic che cura gli altri alieni vicini
+> - [ ] Alieno kamikaze che si lancia verso la navicella
+> - [ ] Boss periodica ogni X minuti (versione gigante del Dreadnought con fasi)
+> - [ ] Formazioni coordinate (più alieni che attaccano in pattern)
+> - [ ] Alieno stealth che diventa visibile solo quando spara

@@ -1,0 +1,106 @@
+---
+type: reference
+tags: [meteoriti, nemici, mondo-principale, gameplay]
+---
+
+# ☄️ Meteoriti
+
+> [!info]
+> I nemici ambientali principali del [[Mondo Principale]]. Spawnano continuamente e aumentano di frequenza col tempo. Alcuni esercitano forze orbitali attorno a [[Elementi del Mondo#Pulsar|Pulsar]] e [[Elementi del Mondo#Supernove|Supernove]].
+
+← [[Mondo Principale]]
+
+---
+
+## Spawn
+
+- **Intervallo base**: 1,7 secondi
+- **Intervallo minimo**: 0,8 secondi (si riduce con il tempo: `max(0.8, 1.7 - elapsed × 0.02)`)
+- Dopo 20 secondi: 40% di probabilità di doppio spawn per intervallo
+- **Split casuale**: ogni ~5s un meteorite casuale (size ≥16) si divide spontaneamente
+
+---
+
+## Tipi di Meteorite
+
+### 🟤 Normale
+| Parametro | Valore |
+|---|---|
+| Colore | Marrone/ocra con shading 3D |
+| Velocità | 60–138 px/s (base) |
+| Danno | 20 HP se grande (≥22), 5 HP se piccolo (<22) |
+| Punti | **+3** |
+
+Il tipo più comune. Aspetto roccioso con highlights procedurali.
+
+---
+
+### 🔴 Rosso (Fast)
+| Parametro | Valore |
+|---|---|
+| Colore | Rosso con glow |
+| Velocità | **2,5× velocità normale** |
+| Danno | **20 HP** sempre |
+| Punti | **+5** |
+
+> [!danger]
+> Sempre letale al contatto indipendentemente dalla dimensione. Velocità molto elevata — priorità alta da eliminare.
+
+---
+
+### 💎 Cristallo (Special)
+| Parametro | Valore |
+|---|---|
+| Colore | Azzurro ghiaccio |
+| Velocità | Normale |
+| Danno | **20 HP** |
+| Punti | **+7** al colpo iniziale **+7** per ogni frammento |
+
+> [!warning] Frammentazione
+> Al colpo si divide in **3 frammenti** più veloci (110–200px/s). Ogni frammento è anch'esso `special` e vale 7 punti. Al momento dello shatter: flash cyan + bianco.
+> 
+> **Attenzione**: i frammenti si muovono in direzioni casuali e possono colpire la navicella per **5 HP** ciascuno.
+
+---
+
+### 💣 Meteorite del Bombardiere
+Lanciato dagli [[Alieni#Bombardiere|alieni Bombardieri]]. Ha una **scia di scintille arancioni** (`isBomb = true`). Si comporta come un normale meteorite ma è visivamente distinto.
+
+---
+
+## Frammenti
+
+Generati quando un meteorite viene distrutto o si divide:
+
+| Parametro | Valore |
+|---|---|
+| Size | < 22px |
+| Danno | **5 HP** |
+| Velocità | 110–200px/s |
+| Tipo | Non `fast`, non `special` |
+| Punti | +3 (normale) |
+
+> [!note]
+> I frammenti non sono innocui — danno 5 HP al contatto. In una zona con molti cristalli la situazione può diventare caotica rapidamente.
+
+---
+
+## Fisica Orbitale
+
+Meteoriti vicini a [[Elementi del Mondo#Pulsar|Pulsar]] e [[Elementi del Mondo#Supernove|Supernove]] (raggio 260–320px) subiscono due forze:
+
+1. **Forza centripeta** — spinge verso orbita ideale al 55% del raggio → crea orbite stabili
+2. **Forza tangenziale** — spinta perpendicolare → fa ruotare il meteorite
+   - Pulsar: rotazione **CW** (oraria)
+   - Supernove: rotazione **CCW** (antioraria)
+
+---
+
+## Note per Sviluppi Futuri
+
+> [!todo] Idee
+> - [ ] Meteorite magnetico che attrae/respinge altri meteoriti
+> - [ ] Meteorite ghost (semitrasparente, ignora ostacoli)
+> - [ ] Meteorite esplosivo (onda d'urto alla distruzione)
+> - [ ] Meteorite corazzato (richiede più colpi)
+> - [ ] Bilanciamento: cristallo con 3 frammenti può essere impossibile in spazi stretti

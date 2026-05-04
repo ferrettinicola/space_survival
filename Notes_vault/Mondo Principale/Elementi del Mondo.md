@@ -1,0 +1,145 @@
+---
+type: reference
+tags: [elementi, mondo-principale, oggetti, scenografia]
+---
+
+# 🪐 Elementi del Mondo
+
+> [!info]
+> Tutti gli oggetti di sfondo generati proceduralmente nel [[Mondo Principale]]. Sono decorativi o interattivi (buchi neri, pulsar, supernove esercitano forze fisiche).
+
+← [[Mondo Principale]]
+
+---
+
+## Pianeti
+
+- **Quantità**: 100 — **Distanza minima**: 900px
+- Raggio: 55–165px
+- **Anelli**: 30% dei pianeti li ha
+- **Lune**: 0, 1 o 2 per pianeta
+- 25 palette di colori disponibili, assegnate casualmente
+- Puramente decorativi — non interagiscono con la navicella
+
+---
+
+## Nebulose
+
+- **Quantità**: 16 — **Distanza minima**: 2.800px
+- Raggio: 1.600–3.600px
+- Grandi nuvole colorate, molto tenui (alpha 0.08–0.14)
+- 4 varianti cromatiche: viola, blu, magenta, verde
+- Decorative — effetto visivo di profondità
+
+---
+
+## Nuvole di Polvere
+
+- **Quantità**: 20 — **Distanza minima**: 1.800px
+- Raggio: 700–1.800px
+- Patch atmosferiche semitrasparenti in toni scuri
+- Decorative
+
+---
+
+## Galassie
+
+- **Quantità**: 18 — **Distanza minima**: 2.200px
+- Forma ellittica con angolo di rotazione casuale
+- Ellisse rx: 280–540px, ry: 90–200px
+- Decorative
+
+---
+
+## Cluster Stellari
+
+- **Quantità**: 12 — **Distanza minima**: 2.400px
+- 65–135 stelle per cluster
+- Raggio cluster: 160–360px
+- Decorativi
+
+---
+
+## Costellazioni
+
+- **Quantità**: 6 — **Distanza minima**: 2.000px
+- Pattern basati su **coordinate astronomiche reali** (RA/Dec)
+- Le 6 costellazioni: **Grande Carro, Orione, Cassiopea, Leone, Scorpione, Cigno**
+- Linee in blu tenue, stelle con glow e flare a croce sulle principali
+- Angolo di rotazione casuale ogni partita
+- Decorative
+
+---
+
+## Cinture di Asteroidi
+
+- **Quantità**: 10 — **Distanza minima**: 2.500px
+- Ellissi di punti rocciosi decorativi
+- Non collidono con la navicella
+- Decorative
+
+---
+
+## Supernove
+
+- **Quantità**: 10 — **Distanza minima**: 2.800px
+- Sfere pulsanti con raggi filamentosi
+- 7 varianti di colore
+- **Effetto fisico sui meteoriti vicini** (raggio 260–320px):
+  - Forza centripeta verso orbita ideale (55% del raggio)
+  - Forza tangenziale **in senso antiorario (CCW)**
+  - Creano orbite stabili attorno a sé
+
+> [!warning] Interattive
+> Le supernove influenzano la traiettoria dei meteoriti nelle vicinanze. Zone da tenere d'occhio durante il combattimento.
+
+---
+
+## Pulsar
+
+- **Quantità**: 10 — **Distanza minima**: 2.800px
+- Stelle con raggi rotanti visibili
+- **Effetto fisico sui meteoriti vicini** (raggio 260–320px):
+  - Forza centripeta verso orbita ideale (55% del raggio)
+  - Forza tangenziale **in senso orario (CW)**
+  - Creano orbite stabili attorno a sé
+
+> [!warning] Interattive
+> Come le supernove ma con rotazione opposta. Le orbite attorno a pulsar ruotano in CW, quelle attorno a supernove in CCW.
+
+---
+
+## Buchi Neri
+
+- **Quantità**: 14 — **Distanza minima**: 2.000px
+- **Portali verso il [[Secondo Mondo]]**
+
+### Aspetto Visivo (8 layer sovrapposti)
+1. Campo gravitazionale vasto (22× raggio, glow viola)
+2. Jet relativistici — due fasci perpendicolari al disco
+3. Disco di accrescimento — 4 anelli: marrone → arancio → giallo → bianco-giallo
+4. Wisps interni contro-rotanti
+5. Fotosfera — anello di lensing gravitazionale
+6. Orizzonte degli eventi — nero assoluto
+7. Rim di blueshift — sottile alone bianco-azzurro
+8. 8 particelle di materia in caduta lungo il disco
+
+### Gravità
+| Parametro | Valore |
+|---|---|
+| Raggio di influenza | 24× raggio (~1.320–2.640px) |
+| Formula forza | `12 + 900 × t³` (cubica) |
+| Effetto su meteoriti | Attrazione proporzionale (inversa alla loro dimensione) |
+
+> [!danger] Interazione con la Navicella
+> Avvicinarsi all'orizzonte degli eventi teletrasporta la navicella nel [[Secondo Mondo]]. La forza gravitazionale aumenta cubicamente — quasi impercettibile lontano, fortissima vicino.
+
+---
+
+## Note per Sviluppi Futuri
+
+> [!todo] Idee
+> - [ ] Pianeti con gravità propria che deflette la navicella
+> - [ ] Supernove che esplodono dopo X secondi (evento dinamico)
+> - [ ] Stazioni spaziali come oggetti neutrali/interattivi
+> - [ ] Wormhole visibile che collega due punti del mondo
