@@ -523,6 +523,8 @@
 <!-- Gear settings button — always visible, top-right -->
 <button id="gear-btn" onclick="openModal('settings')" title="Impostazioni / Settings"
   style="position:fixed;top:14px;right:18px;z-index:40;background:rgba(0,20,40,0.80);border:1px solid rgba(0,245,255,0.3);color:#00f5ff;font-size:18px;width:38px;height:38px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;backdrop-filter:blur(8px);line-height:1;padding:0;">⚙</button>
+<!-- Indicatore stato multiplayer -->
+<div id="mp-status" style="position:fixed;top:60px;right:18px;z-index:30;font-family:'Share Tech Mono',monospace;font-size:11px;color:#888;letter-spacing:0.08em;pointer-events:none;"></div>
 
 <!-- HUD -->
 <div class="hud" id="hud" style="display:none;">
@@ -747,8 +749,8 @@
   <div class="touch-btn" id="t-right">▶</div>
 </div>
 
+<script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 <script>
-// ══════════════════════════════════════════════════════════════════
 // ACCOUNT SYSTEM — localStorage-based, no server required
 // Accounts: Nicola (admin), Valo, Ale — inizializzati al primo avvio
 // ══════════════════════════════════════════════════════════════════
@@ -808,9 +810,9 @@ function attemptLogin() {
   document.getElementById('login-screen').style.display = 'none';
   err.textContent = '';
   applyUserContext();
-  // Avvia musica al login (primo gesto utente già avvenuto con il click)
   AudioEngine.init();
   AudioEngine.startMusic();
+  MP.connect(); // connette al server multiplayer
 }
 
 function logout() {
@@ -824,6 +826,7 @@ function logout() {
   // Ferma musica / audio
   AudioEngine.stopMusic();
   AudioEngine.stopThrust();
+  MP.disconnect();
   // Chiudi modal e schermata di gioco se aperte
   closeModal();
   showStart();
@@ -840,6 +843,7 @@ function restoreSession() {
       currentUser = match;
       document.getElementById('login-screen').style.display = 'none';
       applyUserContext();
+      MP.connect();
       return true;
     }
   }
@@ -990,6 +994,183 @@ function devDeleteUser(id) {
   saveAccounts(accounts);
   renderDevPanel();
 }
+
+
+// ══════════════════════════════════════════════════════════════════
+// MULTIPLAYER — Socket.io client
+// ⚠️  Dopo il deploy su Railway, sostituisci SERVER_URL con il tuo URL
+// ══════════════════════════════════════════════════════════════════
+const SERVER_URL = 'https://space-race-server-production.up.railway.app'; // ← CAMBIA QUI
+
+const MP = (() => {
+  let socket       = null;
+  let _inGame      = false;
+  let _lastSend    = 0;
+  let _statusEl    = null;
+  let _hitMsg      = '';
+  let _hitMsgTimer = 0;
+
+  const remotePlayers = new Map();
+  const remoteBullets = [];
+  const SKIN_COLS = ['#00f5ff','#ff6b35','#cc44ff','#ffd700'];
+
+  function _setStatus(txt, color) {
+    if (!_statusEl) _statusEl = document.getElementById('mp-status');
+    if (_statusEl) { _statusEl.textContent = txt; _statusEl.style.color = color || '#00f5ff'; }
+  }
+
+  function connect() {
+    if (socket || typeof io === 'undefined') return;
+    if (SERVER_URL.includes('IL-TUO-SERVER')) {
+      _setStatus('● single player', '#888'); return;
+    }
+    _setStatus('● connessione...', '#ffcc00');
+    socket = io(SERVER_URL, { transports: ['websocket'], reconnectionDelay: 2000 });
+
+    socket.on('connect', () => _setStatus('● online', '#00ff60'));
+    socket.on('connect_error', () => _setStatus('● server offline', '#ff5555'));
+    socket.on('disconnect', () => {
+      _setStatus('● offline', '#888');
+      remotePlayers.clear(); remoteBullets.length = 0;
+    });
+    socket.on('players', (list) => {
+      for (const [id, p] of Object.entries(list))
+        if (id !== socket.id) remotePlayers.set(id, {...p});
+    });
+    socket.on('player_joined', (p) => {
+      if (p.id !== socket.id) remotePlayers.set(p.id, {...p});
+    });
+    socket.on('player_update', (d) => {
+      if (d.id === socket.id) return;
+      const p = remotePlayers.get(d.id);
+      if (p) Object.assign(p, d);
+    });
+    socket.on('player_left', (id) => remotePlayers.delete(id));
+    socket.on('bullet', (d) => {
+      remoteBullets.push({ x:d.x, y:d.y, vx:d.vx, vy:d.vy,
+        life:1, maxLife:d.maxLife||0.85, col:SKIN_COLS[d.skin||0], shooterId:d.shooterId });
+    });
+    socket.on('take_damage', (d) => {
+      if (player && state === 'playing' && !inVoid) {
+        damagePlayer(d.damage || 3);
+        _hitMsg = `Colpito da ${d.fromUsername}!`;
+        _hitMsgTimer = 2.5;
+      }
+    });
+  }
+
+  function joinGame() {
+    if (!socket || !player) return;
+    _inGame = true;
+    remotePlayers.clear(); remoteBullets.length = 0;
+    socket.emit('join', {
+      username: currentUser?.username || 'Player',
+      skin: selectedSkin, x: player.x, y: player.y,
+      angle: player.angle, hp: player.hp,
+    });
+  }
+
+  function leaveGame() {
+    _inGame = false;
+    remotePlayers.clear(); remoteBullets.length = 0;
+    if (socket) socket.emit('leave_game');
+  }
+
+  function sendUpdate() {
+    if (!socket || !player || !_inGame || inVoid) return;
+    const now = performance.now();
+    if (now - _lastSend < 50) return;
+    _lastSend = now;
+    socket.emit('update', {
+      x:player.x, y:player.y, angle:player.angle,
+      hp:player.hp, score:Math.floor(score), skin:selectedSkin,
+    });
+  }
+
+  function sendBullet(b) {
+    if (!socket || !_inGame || inVoid) return;
+    socket.emit('bullet', { x:b.x, y:b.y, vx:b.vx, vy:b.vy, maxLife:b.maxLife, skin:selectedSkin });
+  }
+
+  function checkHit(b) {
+    if (!socket || !_inGame || inVoid) return false;
+    for (const [id, rp] of remotePlayers) {
+      const dx = b.x - rp.x, dy = b.y - rp.y;
+      if (Math.sqrt(dx*dx + dy*dy) < 24) {
+        socket.emit('hit', { targetId:id, damage:3 });
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function updateRemoteBullets(dt) {
+    for (let i = remoteBullets.length-1; i >= 0; i--) {
+      const b = remoteBullets[i];
+      b.x += b.vx*dt; b.y += b.vy*dt; b.life -= dt/b.maxLife;
+      if (b.life <= 0) remoteBullets.splice(i,1);
+    }
+  }
+
+  function drawRemotePlayers() {
+    if (!_inGame) return;
+    for (const [, rp] of remotePlayers) {
+      if (!rp.x) continue;
+      const sx = rp.x - camera.x + W/2, sy = rp.y - camera.y + H/2;
+      if (sx < -80 || sx > W+80 || sy < -80 || sy > H+80) continue;
+      ctx.save(); ctx.translate(sx, sy);
+      ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2);
+      ctx.fillStyle = SKIN_COLS[rp.skin||0]+'22'; ctx.fill();
+      ctx.font = '700 10px "Orbitron",sans-serif';
+      ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(220,240,255,0.9)';
+      ctx.fillText(rp.username||'?', 0, -28);
+      const bw=40, bh=3, hpf=Math.max(0,(rp.hp||0)/20);
+      ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(-bw/2,-22,bw,bh);
+      ctx.fillStyle = hpf>0.5?'#00ff60':hpf>0.25?'#ffcc00':'#ff4444';
+      ctx.fillRect(-bw/2,-22,bw*hpf,bh);
+      ctx.rotate(rp.angle||0);
+      const col = SKIN_COLS[rp.skin||0];
+      ctx.fillStyle=col; ctx.strokeStyle=col; ctx.lineWidth=1.2;
+      ctx.beginPath();
+      ctx.moveTo(17,0); ctx.lineTo(-9,-8); ctx.lineTo(-5,0); ctx.lineTo(-9,8);
+      ctx.closePath(); ctx.fill();
+      ctx.globalAlpha=0.35; ctx.stroke(); ctx.globalAlpha=1;
+      ctx.restore();
+    }
+  }
+
+  function drawRemoteBullets() {
+    if (!_inGame) return;
+    remoteBullets.forEach(b => {
+      const sx=b.x-camera.x+W/2, sy=b.y-camera.y+H/2;
+      if (sx<-20||sx>W+20||sy<-20||sy>H+20) return;
+      ctx.globalAlpha = Math.max(0, b.life*0.9+0.1);
+      ctx.beginPath(); ctx.arc(sx,sy,4,0,Math.PI*2);
+      ctx.fillStyle = b.col||'#ff8800'; ctx.fill();
+      ctx.globalAlpha=1;
+    });
+  }
+
+  function drawHitMessage(dt) {
+    if (_hitMsgTimer <= 0) return;
+    _hitMsgTimer -= dt;
+    const alpha = Math.min(1, _hitMsgTimer*1.5);
+    ctx.save(); ctx.globalAlpha=alpha;
+    ctx.font='700 13px "Orbitron",sans-serif'; ctx.textAlign='center';
+    ctx.fillStyle='#ff4444'; ctx.fillText(_hitMsg, W/2, H/2+70);
+    ctx.restore();
+  }
+
+  function disconnect() {
+    if (socket) { socket.disconnect(); socket=null; }
+    remotePlayers.clear(); remoteBullets.length=0; _inGame=false;
+  }
+
+  return { connect, joinGame, leaveGame, sendUpdate, sendBullet, checkHit,
+           updateRemoteBullets, drawRemotePlayers, drawRemoteBullets, drawHitMessage,
+           disconnect, get active() { return !!socket && _inGame; } };
+})();
+// ══════════════════════════════════════════════════════════════════
 
 // ══════════════════════════════════════════════════════════════════
 
@@ -4472,8 +4653,7 @@ function tryShoot() {
     player.ammoCharge = Math.max(0, player.ammoCharge - 0.055);
   }
 
-  const aimAngle = player.angle;
-  const speed = stats.bulletSpeed;
+  const aimAngle = player.angle;  const speed = stats.bulletSpeed;
   const noseX = player.x + Math.cos(aimAngle) * 16;
   const noseY = player.y + Math.sin(aimAngle) * 16;
 
@@ -4487,6 +4667,7 @@ function tryShoot() {
     type: stats.bulletType,
     pierces: stats.bulletType === 'rapid' ? 2 : 0,
   });
+  MP.sendBullet(bullets[bullets.length - 1]);
 
   // VIPER ability: twin shot at ±0.18 rad offset
   if (selectedSkin === 0 && shipAbilityTimer > 0) {
@@ -4535,6 +4716,9 @@ function updateAndDrawBullets(dt) {
 
     // Bullet-meteor collision — query only nearby meteors from spatial hash
     const nearby = meteorSpatialHash.query(b.x, b.y, 80);
+
+    // ── PvP: controlla se il proiettile colpisce un avversario ──
+    if (MP.checkHit(b)) return false;
     for (const {m, i} of nearby) {
       if (toDestroy.has(i)) continue;
       const dx = b.x - m.x, dy = b.y - m.y;
@@ -5397,6 +5581,7 @@ function gameLoop(ts) {
 
     // Meteor–meteor collisions
     checkMeteorCollisions();
+  MP.updateRemoteBullets(dt);
 
     // Remove meteors far outside viewport (keep those potentially orbiting nearby objects)
     const margin = 500;
@@ -5421,8 +5606,12 @@ function gameLoop(ts) {
     drawAliens();
     updateAndDrawPowerUps(dt);
     drawPlayer(player, dt);
+    MP.drawRemotePlayers();
+    MP.drawRemoteBullets();
 
     ctx.restore();
+
+    MP.drawHitMessage(dt);
 
     // Meteor-player collision
     if (state === 'playing') {
@@ -5465,6 +5654,7 @@ function gameLoop(ts) {
     updatePowerupSidebar();
     AudioEngine.tickLowHp(dt, player && player.hp <= 3);
     AudioEngine.thrustTick(dt, player && player.thrustOn, player && player.boosting);
+    MP.sendUpdate();
     const tc = document.getElementById('hud-timer-corner');
     if (tc) tc.textContent = fmtTime(elapsed);
     // HUD update
@@ -5515,6 +5705,7 @@ function showStart() {
 }
 
 function showGameOver() {
+  MP.leaveGame();
   document.getElementById('screen-over').classList.remove('hidden');
   document.getElementById('hud').style.display = 'none';
   const tc = document.getElementById('hud-timer-corner');
@@ -5761,6 +5952,7 @@ function startGame() {
   AudioEngine.stopThrust();
   AudioEngine.stopMusic();
   AudioEngine.startMusic();
+  MP.joinGame();
   document.getElementById('screen-start').classList.add('hidden');
   document.getElementById('screen-over').classList.add('hidden');
   document.getElementById('hud').style.display = 'flex';
