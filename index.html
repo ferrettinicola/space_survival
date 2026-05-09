@@ -1166,15 +1166,23 @@ const MP = (() => {
     }
   }
 
+  // Disegna navicelle remote in coordinate MONDO (dentro camera transform, come drawPlayer)
   function drawRemotePlayers() {
     if (!_inGame) return;
     for (const [, rp] of remotePlayers) {
-      if (!rp.x) continue;
-      const sx = rp.x - camera.x + W/2, sy = rp.y - camera.y + H/2;
-      if (sx < -80 || sx > W+80 || sy < -80 || sy > H+80) continue;
-      ctx.save(); ctx.translate(sx, sy);
+      if (rp.x == null) continue;
+      // Culling in coordinate mondo
+      const dx = rp.x - camera.x, dy = rp.y - camera.y;
+      if (Math.abs(dx) > W/2 + 100 || Math.abs(dy) > H/2 + 100) continue;
+
+      ctx.save();
+      ctx.translate(rp.x, rp.y); // coordinate mondo — la camera transform fa il resto
+
+      // Aureola
       ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2);
       ctx.fillStyle = SKIN_COLS[rp.skin||0]+'22'; ctx.fill();
+
+      // Nome e HP bar (non ruotano con la nave)
       ctx.font = '700 10px "Orbitron",sans-serif';
       ctx.textAlign = 'center'; ctx.fillStyle = 'rgba(220,240,255,0.9)';
       ctx.fillText(rp.username||'?', 0, -28);
@@ -1182,24 +1190,28 @@ const MP = (() => {
       ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(-bw/2,-22,bw,bh);
       ctx.fillStyle = hpf>0.5?'#00ff60':hpf>0.25?'#ffcc00':'#ff4444';
       ctx.fillRect(-bw/2,-22,bw*hpf,bh);
+
+      // Forma navicella (ruotata)
       ctx.rotate(rp.angle||0);
       const col = SKIN_COLS[rp.skin||0];
-      ctx.fillStyle=col; ctx.strokeStyle=col; ctx.lineWidth=1.2;
+      ctx.fillStyle=col; ctx.strokeStyle=col; ctx.lineWidth=1.5;
       ctx.beginPath();
       ctx.moveTo(17,0); ctx.lineTo(-9,-8); ctx.lineTo(-5,0); ctx.lineTo(-9,8);
       ctx.closePath(); ctx.fill();
-      ctx.globalAlpha=0.35; ctx.stroke(); ctx.globalAlpha=1;
+      ctx.globalAlpha=0.4; ctx.stroke(); ctx.globalAlpha=1;
+
       ctx.restore();
     }
   }
 
+  // Disegna proiettili remoti in coordinate MONDO
   function drawRemoteBullets() {
     if (!_inGame) return;
     remoteBullets.forEach(b => {
-      const sx=b.x-camera.x+W/2, sy=b.y-camera.y+H/2;
-      if (sx<-20||sx>W+20||sy<-20||sy>H+20) return;
+      const dx = b.x - camera.x, dy = b.y - camera.y;
+      if (Math.abs(dx) > W/2+20 || Math.abs(dy) > H/2+20) return;
       ctx.globalAlpha = Math.max(0, b.life*0.9+0.1);
-      ctx.beginPath(); ctx.arc(sx,sy,4,0,Math.PI*2);
+      ctx.beginPath(); ctx.arc(b.x, b.y, 4, 0, Math.PI*2);
       ctx.fillStyle = b.col||'#ff8800'; ctx.fill();
       ctx.globalAlpha=1;
     });
@@ -5782,12 +5794,11 @@ function gameLoop(ts) {
     drawAliens();
     updateAndDrawPowerUps(dt);
     drawPlayer(player, dt);
+    MP.drawRemotePlayers();   // coordinate mondo — dentro camera transform
+    MP.drawRemoteBullets();   // coordinate mondo — dentro camera transform
 
     ctx.restore(); // fine trasformazione camera
 
-    // Navicelle e proiettili remoti: disegnati in coordinate schermo (fuori dalla camera transform)
-    MP.drawRemotePlayers();
-    MP.drawRemoteBullets();
     MP.drawHitMessage(dt);
     drawMinimap();
     if (state === 'playing') {
