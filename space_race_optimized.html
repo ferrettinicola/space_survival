@@ -487,6 +487,36 @@
 </head>
 <body>
 
+
+<!-- ════════════════════════════════════════════════════════════════
+     LOGIN SCREEN — shown before everything, z-index 200
+     ════════════════════════════════════════════════════════════════ -->
+<div id="login-screen" style="position:fixed;inset:0;z-index:200;background:radial-gradient(ellipse at center,rgba(0,30,60,0.96) 0%,rgba(3,7,15,0.99) 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;">
+  <div class="logo" style="margin-bottom:6px;">SPACE RACE</div>
+  <div class="sub" style="margin-bottom:40px;" data-i="sub_tagline">SOPRAVVIVI AL COSMO</div>
+
+  <div style="width:310px;background:rgba(0,20,40,0.88);border:1px solid rgba(0,245,255,0.28);border-radius:6px;padding:30px 28px 26px;backdrop-filter:blur(14px);">
+    <div style="font-family:'Orbitron',sans-serif;font-size:9px;letter-spacing:0.32em;color:rgba(200,232,248,0.4);margin-bottom:22px;text-align:center;">ACCESSO AL PROFILO</div>
+
+    <label style="display:block;font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:0.22em;color:rgba(200,232,248,0.38);margin-bottom:5px;">NOME UTENTE</label>
+    <input id="login-user" type="text" autocomplete="off" spellcheck="false"
+      style="width:100%;box-sizing:border-box;font-family:'Share Tech Mono',monospace;font-size:15px;background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.2);border-radius:3px;color:var(--cyan);padding:9px 13px;outline:none;letter-spacing:0.1em;margin-bottom:14px;transition:border-color 0.2s;">
+
+    <label style="display:block;font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:0.22em;color:rgba(200,232,248,0.38);margin-bottom:5px;">PASSWORD</label>
+    <input id="login-pass" type="password" autocomplete="off"
+      style="width:100%;box-sizing:border-box;font-family:'Share Tech Mono',monospace;font-size:15px;background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.2);border-radius:3px;color:var(--cyan);padding:9px 13px;outline:none;letter-spacing:0.16em;margin-bottom:8px;transition:border-color 0.2s;">
+
+    <div id="login-error" style="color:#ff5555;font-size:10px;letter-spacing:0.12em;min-height:14px;margin-bottom:10px;text-align:center;"></div>
+
+    <button onclick="attemptLogin()"
+      style="width:100%;font-family:'Orbitron',sans-serif;font-size:12px;font-weight:700;letter-spacing:0.22em;color:#020810;background:var(--cyan);border:none;border-radius:3px;padding:12px;cursor:pointer;text-transform:uppercase;box-shadow:0 0 18px rgba(0,245,255,0.35);transition:all 0.15s;">
+      ENTRA ▶
+    </button>
+  </div>
+
+  <div style="margin-top:16px;font-size:9px;letter-spacing:0.14em;color:rgba(200,232,248,0.18);">Solo gli account registrati possono accedere</div>
+</div>
+
 <canvas id="c"></canvas>
 
 <!-- Language toggle -->
@@ -655,6 +685,31 @@
         </button>
       </div>
       <div id="ctrl-mode-hint" style="margin-top:10px;font-size:11px;color:rgba(200,232,248,0.45);letter-spacing:0.06em;line-height:1.7;text-align:center;"></div>
+
+      <!-- ── Dev Panel (solo admin) ── -->
+      <div id="sett-dev-btn-wrap" style="margin-top:18px;display:none;">
+        <button id="sett-dev-btn" onclick="openModal('devpanel')"
+          style="width:100%;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.2em;padding:12px;border:1px solid rgba(255,215,0,0.35);border-radius:4px;background:rgba(255,215,0,0.07);color:var(--gold);cursor:pointer;transition:all 0.15s;">
+          ⚙ PANNELLO SVILUPPATORE
+        </button>
+      </div>
+
+      <!-- ── Logout ── -->
+      <div id="sett-logout-section" style="margin-top:18px;padding-top:16px;border-top:1px solid rgba(0,245,255,0.1);">
+        <div style="font-size:10px;letter-spacing:0.14em;color:rgba(200,232,248,0.35);text-align:center;margin-bottom:10px;">
+          Connesso come <span id="sett-logout-user" style="color:var(--cyan);"></span>
+        </div>
+        <button onclick="logout()"
+          style="width:100%;font-family:'Orbitron',sans-serif;font-size:11px;font-weight:700;letter-spacing:0.2em;padding:12px;border:1px solid rgba(255,80,80,0.3);border-radius:4px;background:rgba(255,80,80,0.07);color:#ff5555;cursor:pointer;transition:all 0.15s;">
+          ✕ LOGOUT
+        </button>
+      </div>
+    </div>
+
+    <!-- Dev Panel — admin only -->
+    <div id="modal-devpanel" class="hidden">
+      <div class="modal-title">⚙ GESTIONE UTENTI</div>
+      <div id="devpanel-content" style="width:100%;margin-top:8px;"></div>
     </div>
 
   </div>
@@ -672,10 +727,8 @@
   </div>
   <div class="record-badge" id="record-badge"></div>
 
-  <div class="name-row">
-    <input type="text" id="player-name" maxlength="16" data-i-placeholder="name_placeholder" placeholder="Il tuo nome..." autocomplete="off" spellcheck="false">
-    <button class="btn-sm" onclick="saveScore()" data-i="btn_save">SALVA</button>
-  </div>
+  <!-- Score auto-salvato: nessun input manuale -->
+  <div id="autosave-badge" style="font-family:'Orbitron',sans-serif;font-size:10px;letter-spacing:0.18em;color:rgba(0,245,255,0.7);margin-top:14px;text-align:center;min-height:18px;"></div>
 
   <div class="lb-title" data-i="btn_rank">CLASSIFICA</div>
   <ul class="lb-list" id="lb-list"></ul>
@@ -696,7 +749,248 @@
 
 <script>
 // ══════════════════════════════════════════════════════════════════
-// PERFORMANCE LAYER — added optimizations
+// ACCOUNT SYSTEM — localStorage-based, no server required
+// Accounts: Nicola (admin), Valo, Ale — inizializzati al primo avvio
+// ══════════════════════════════════════════════════════════════════
+
+const DEFAULT_ACCOUNTS = [
+  { id: 1, username: 'Nicola', password: 'abc', isAdmin: true  },
+  { id: 2, username: 'Valo',   password: '123', isAdmin: false },
+  { id: 3, username: 'Ale',    password: '123', isAdmin: false },
+];
+
+let currentUser = null; // oggetto account loggato
+
+function initAccounts() {
+  if (!localStorage.getItem('vr_accounts')) {
+    localStorage.setItem('vr_accounts', JSON.stringify(DEFAULT_ACCOUNTS));
+  }
+}
+
+function getAccounts() {
+  try { return JSON.parse(localStorage.getItem('vr_accounts') || '[]'); }
+  catch { return []; }
+}
+
+function saveAccounts(arr) {
+  localStorage.setItem('vr_accounts', JSON.stringify(arr));
+}
+
+function getNextId() {
+  const accounts = getAccounts();
+  return accounts.length ? Math.max(...accounts.map(a => a.id)) + 1 : 1;
+}
+
+// Restituisce il best score per un utente
+function getUserBest(username) {
+  return parseInt(localStorage.getItem('vr_best_' + username) || '0');
+}
+
+function setUserBest(username, score) {
+  const cur = getUserBest(username);
+  if (score > cur) localStorage.setItem('vr_best_' + username, score);
+}
+
+// ── Login / Logout ─────────────────────────────────────────────
+function attemptLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const err  = document.getElementById('login-error');
+  const accounts = getAccounts();
+  const match = accounts.find(a => a.username === user && a.password === pass);
+  if (!match) {
+    err.textContent = 'Credenziali non valide';
+    document.getElementById('login-pass').value = '';
+    return;
+  }
+  currentUser = match;
+  localStorage.setItem('vr_session', match.username);
+  document.getElementById('login-screen').style.display = 'none';
+  err.textContent = '';
+  applyUserContext();
+  // Avvia musica al login (primo gesto utente già avvenuto con il click)
+  AudioEngine.init();
+  AudioEngine.startMusic();
+}
+
+function logout() {
+  currentUser = null;
+  localStorage.removeItem('vr_session');
+  // Torna alla login screen
+  document.getElementById('login-screen').style.display = 'flex';
+  document.getElementById('login-user').value = '';
+  document.getElementById('login-pass').value = '';
+  document.getElementById('login-error').textContent = '';
+  // Ferma musica / audio
+  AudioEngine.stopMusic();
+  AudioEngine.stopThrust();
+  // Chiudi modal e schermata di gioco se aperte
+  closeModal();
+  showStart();
+}
+
+// Ripristina sessione al refresh pagina
+function restoreSession() {
+  initAccounts();
+  const savedUser = localStorage.getItem('vr_session');
+  if (savedUser) {
+    const accounts = getAccounts();
+    const match = accounts.find(a => a.username === savedUser);
+    if (match) {
+      currentUser = match;
+      document.getElementById('login-screen').style.display = 'none';
+      applyUserContext();
+      return true;
+    }
+  }
+  return false;
+}
+
+// Aggiorna UI con i dati dell'utente loggato
+function applyUserContext() {
+  if (!currentUser) return;
+  const best = getUserBest(currentUser.username);
+  const hb = document.getElementById('hud-best');
+  if (hb) hb.textContent = best;
+  // Mostra pulsante dev panel nelle impostazioni se admin
+  const devWrap = document.getElementById('sett-dev-btn-wrap');
+  if (devWrap) devWrap.style.display = currentUser.isAdmin ? '' : 'none';
+  // Mostra logout nel pannello impostazioni
+  const logoutSection = document.getElementById('sett-logout-section');
+  if (logoutSection) {
+    logoutSection.style.display = '';
+    const logoutUser = document.getElementById('sett-logout-user');
+    if (logoutUser) logoutUser.textContent = currentUser.username;
+  }
+}
+
+// Enter key su login form
+function _loginKeydown(e) { if (e.key === 'Enter') attemptLogin(); }
+
+// ── Dev Panel ──────────────────────────────────────────────────
+function renderDevPanel() {
+  const accounts = getAccounts();
+  const div = document.getElementById('devpanel-content');
+  if (!div) return;
+
+  div.innerHTML = `
+    <div style="font-size:10px;letter-spacing:0.15em;color:rgba(200,232,248,0.4);margin-bottom:12px;">
+      ${accounts.length} account registrati
+    </div>
+
+    <div id="dev-users-list" style="margin-bottom:16px;display:flex;flex-direction:column;gap:8px;"></div>
+
+    <div style="border-top:1px solid rgba(0,245,255,0.12);padding-top:14px;margin-top:4px;">
+      <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:0.22em;color:rgba(200,232,248,0.4);margin-bottom:10px;">AGGIUNGI UTENTE</div>
+      <div style="display:flex;gap:8px;margin-bottom:6px;">
+        <input id="dev-new-user" placeholder="Nome utente" maxlength="20" autocomplete="off"
+          style="flex:1;font-family:'Share Tech Mono',monospace;font-size:13px;background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.18);border-radius:3px;color:var(--cyan);padding:7px 10px;outline:none;">
+        <input id="dev-new-pass" placeholder="Password" maxlength="30" type="password"
+          style="flex:1;font-family:'Share Tech Mono',monospace;font-size:13px;background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.18);border-radius:3px;color:var(--cyan);padding:7px 10px;outline:none;">
+      </div>
+      <div id="dev-add-error" style="color:#ff5555;font-size:10px;min-height:14px;margin-bottom:6px;"></div>
+      <button onclick="devAddUser()"
+        style="width:100%;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.15em;color:#020810;background:var(--cyan);border:none;border-radius:3px;padding:9px;cursor:pointer;">
+        + AGGIUNGI
+      </button>
+    </div>
+  `;
+
+  const list = document.getElementById('dev-users-list');
+  accounts.forEach(acc => {
+    const row = document.createElement('div');
+    row.style.cssText = 'background:rgba(0,245,255,0.04);border:1px solid rgba(0,245,255,0.12);border-radius:4px;padding:10px 12px;';
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+        <span style="font-family:'Orbitron',sans-serif;font-size:10px;color:${acc.isAdmin ? 'var(--gold)' : 'var(--cyan)'};letter-spacing:0.12em;">
+          ${escHtml(acc.username)}${acc.isAdmin ? ' ★' : ''}
+        </span>
+        <button onclick="devToggleEdit(${acc.id})"
+          style="font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.12em;background:rgba(0,245,255,0.1);color:var(--cyan);border:1px solid rgba(0,245,255,0.25);border-radius:3px;padding:4px 10px;cursor:pointer;">
+          MODIFICA
+        </button>
+      </div>
+      <div id="dev-edit-${acc.id}" style="display:none;margin-top:10px;display:none;">
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <input id="dev-edit-user-${acc.id}" value="${escHtml(acc.username)}" maxlength="20"
+            style="flex:1;font-family:'Share Tech Mono',monospace;font-size:12px;background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.18);border-radius:3px;color:var(--cyan);padding:6px 8px;outline:none;" placeholder="Nome utente">
+          <input id="dev-edit-pass-${acc.id}" type="password" placeholder="Nuova password"  maxlength="30"
+            style="flex:1;font-family:'Share Tech Mono',monospace;font-size:12px;background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.18);border-radius:3px;color:var(--cyan);padding:6px 8px;outline:none;">
+        </div>
+        <div style="display:flex;gap:6px;">
+          <button onclick="devSaveEdit(${acc.id})"
+            style="flex:1;font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.1em;background:rgba(0,245,255,0.12);color:var(--cyan);border:1px solid rgba(0,245,255,0.3);border-radius:3px;padding:6px;cursor:pointer;">
+            ✓ SALVA
+          </button>
+          ${acc.id !== 1 ? `<button onclick="devDeleteUser(${acc.id})"
+            style="font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.1em;background:rgba(255,60,60,0.1);color:#ff5555;border:1px solid rgba(255,60,60,0.3);border-radius:3px;padding:6px 10px;cursor:pointer;">
+            ✕
+          </button>` : ''}
+        </div>
+      </div>
+    `;
+    list.appendChild(row);
+  });
+}
+
+function devToggleEdit(id) {
+  const el = document.getElementById('dev-edit-' + id);
+  if (!el) return;
+  el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+
+function devSaveEdit(id) {
+  const newUser = (document.getElementById('dev-edit-user-' + id)?.value || '').trim();
+  const newPass = (document.getElementById('dev-edit-pass-' + id)?.value || '').trim();
+  if (!newUser) return;
+
+  let accounts = getAccounts();
+  // Check duplicate username (excluding this account)
+  if (accounts.some(a => a.id !== id && a.username === newUser)) {
+    alert('Nome utente già in uso.'); return;
+  }
+
+  accounts = accounts.map(a => {
+    if (a.id !== id) return a;
+    const updated = { ...a, username: newUser };
+    if (newPass) updated.password = newPass;
+    return updated;
+  });
+  saveAccounts(accounts);
+
+  // Se l'utente ha modificato sé stesso, aggiorna sessione
+  if (currentUser && currentUser.id === id) {
+    currentUser = accounts.find(a => a.id === id);
+    localStorage.setItem('vr_session', currentUser.username);
+  }
+
+  renderDevPanel();
+}
+
+function devAddUser() {
+  const u = (document.getElementById('dev-new-user')?.value || '').trim();
+  const p = (document.getElementById('dev-new-pass')?.value || '').trim();
+  const errEl = document.getElementById('dev-add-error');
+
+  if (!u || !p) { errEl.textContent = 'Compila entrambi i campi.'; return; }
+  const accounts = getAccounts();
+  if (accounts.some(a => a.username === u)) { errEl.textContent = 'Nome già in uso.'; return; }
+
+  accounts.push({ id: getNextId(), username: u, password: p, isAdmin: false });
+  saveAccounts(accounts);
+  errEl.textContent = '';
+  renderDevPanel();
+}
+
+function devDeleteUser(id) {
+  if (id === 1) return; // non cancellare Nicola
+  if (!confirm('Eliminare questo utente?')) return;
+  let accounts = getAccounts();
+  accounts = accounts.filter(a => a.id !== id);
+  saveAccounts(accounts);
+  renderDevPanel();
+}
+
 // ══════════════════════════════════════════════════════════════════
 
 // ── 1. Spatial hash for O(1) bullet-meteor collision lookup ───────
@@ -1518,31 +1812,27 @@ function showInstrTab(tab) {
 }
 
 // ─── LOCALSTORAGE ────────────────────────────────────────────────
+// Account-based leaderboard — legge il best score di ogni account registrato
 function getScores() {
-  try {
-    const raw = JSON.parse(localStorage.getItem('vr_scores') || '[]');
-    // Deduplicate by name (case-insensitive), keep highest score
-    const map = new Map();
-    raw.forEach(s => {
-      const key = (s.name || '').toLowerCase();
-      if (!map.has(key) || (s.score ?? 0) > (map.get(key).score ?? 0)) {
-        map.set(key, s);
-      }
-    });
-    return Array.from(map.values()).sort((a,b) => (b.score??0) - (a.score??0));
-  } catch { return []; }
+  const accounts = getAccounts();
+  return accounts
+    .map(a => ({
+      name: a.username,
+      score: getUserBest(a.username),
+      time: parseInt(localStorage.getItem('vr_best_time_' + a.username) || '0'),
+      isAdmin: a.isAdmin,
+    }))
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
 }
-function saveScores(arr) {
-  // Always deduplicate before saving
-  const map = new Map();
-  arr.forEach(s => {
-    const key = (s.name || '').toLowerCase();
-    if (!map.has(key) || (s.score ?? 0) > (map.get(key).score ?? 0)) {
-      map.set(key, s);
-    }
-  });
-  const clean = Array.from(map.values()).sort((a,b)=>(b.score??0)-(a.score??0)).slice(0,20);
-  localStorage.setItem('vr_scores', JSON.stringify(clean));
+
+// Salva il punteggio dell'utente corrente (se è il suo record personale)
+function saveCurrentUserScore(finalScore, finalTime) {
+  if (!currentUser) return;
+  const cur = getUserBest(currentUser.username);
+  if (finalScore > cur) {
+    setUserBest(currentUser.username, finalScore);
+    localStorage.setItem('vr_best_time_' + currentUser.username, Math.round(finalTime));
+  }
 }
 
 function initStars() {
@@ -5204,6 +5494,13 @@ function gameLoop(ts) {
 
 // ─── SHOW / HIDE SCREENS ─────────────────────────────────────────
 function showStart() {
+  if (!currentUser) {
+    // Non loggato — mostra login screen
+    document.getElementById('login-screen').style.display = 'flex';
+    document.getElementById('screen-start').classList.add('hidden');
+    return;
+  }
+  document.getElementById('login-screen').style.display = 'none';
   document.getElementById('screen-start').classList.remove('hidden');
   document.getElementById('screen-over').classList.add('hidden');
   document.getElementById('hud').style.display = 'none';
@@ -5212,7 +5509,6 @@ function showStart() {
   const tc = document.getElementById('hud-timer-corner');
   if (tc) tc.style.display = 'none';
   closeModal();
-  // Riavvia la musica (ferma prima il sequencer precedente se attivo)
   AudioEngine.stopThrust();
   AudioEngine.stopMusic();
   AudioEngine.startMusic();
@@ -5235,27 +5531,32 @@ function showGameOver() {
   const isRecord = Math.floor(score) > bestScore;
   document.getElementById('record-badge').textContent = isRecord ? STRINGS[currentLang].record_badge : '';
 
-  const nameInput = document.getElementById('player-name');
-  nameInput.value = savedName;
-  setTimeout(() => nameInput.focus(), 100);
-
+  // Auto-salva punteggio per l'utente loggato (nessun input manuale)
+  if (currentUser) {
+    const finalScore = Math.floor(score);
+    saveCurrentUserScore(finalScore, elapsed);
+    const isRecord = finalScore > getUserBest(currentUser.username) || finalScore === getUserBest(currentUser.username);
+    const badge = document.getElementById('record-badge');
+    if (badge) badge.textContent = (finalScore >= getUserBest(currentUser.username) && finalScore > 0) ? STRINGS[currentLang].record_badge || '★ NUOVO RECORD!' : '';
+    const ab = document.getElementById('autosave-badge');
+    if (ab) ab.textContent = '✓ Punteggio salvato per ' + currentUser.username;
+  }
   renderLeaderboard();
 }
 
 function renderLeaderboard() {
   const scores = getScores();
   const list = document.getElementById('lb-list');
-  if (scores.length === 0) {
-    list.innerHTML = '<li style="justify-content:center;color:rgba(200,232,248,0.3);font-size:12px;">Nessun record ancora</li>';
-    return;
-  }
-  list.innerHTML = scores.slice(0,10).map((s, i) =>
-    `<li>
-      <span class="rank">#${i+1}</span>
-      <span class="name">${escHtml(s.name)}</span>
-      <span class="score">${s.score ?? '-'} pt &nbsp;<span style="opacity:0.45;font-size:11px;">${fmtTime(s.time)}</span></span>
-    </li>`
-  ).join('');
+  if (!list) return;
+  list.innerHTML = scores.map((s, i) => {
+    const isMe = currentUser && s.name === currentUser.username;
+    const crown = i === 0 && s.score > 0 ? '★ ' : '';
+    return `<li style="${isMe ? 'background:rgba(0,245,255,0.06);border-left:2px solid var(--cyan);' : ''}">
+      <span class="rank" style="${i===0 && s.score>0 ? 'color:var(--gold);' : ''}">#${i+1}</span>
+      <span class="name" style="${isMe ? 'color:var(--cyan);' : ''}">${crown}${escHtml(s.name)}${isMe ? ' (tu)' : ''}</span>
+      <span class="score">${s.score > 0 ? s.score + ' pt' : '—'} &nbsp;<span style="opacity:0.45;font-size:11px;">${s.score > 0 ? fmtTime(s.time) : ''}</span></span>
+    </li>`;
+  }).join('') || '<li style="justify-content:center;color:rgba(200,232,248,0.3);font-size:12px;">Nessun punteggio ancora</li>';
 }
 
 // ─── MODAL ───────────────────────────────────────────────────────
@@ -5265,11 +5566,14 @@ function openModal(which) {
   document.getElementById('modal-leaderboard').classList.add('hidden');
   document.getElementById('modal-skins').classList.add('hidden');
   document.getElementById('modal-settings').classList.add('hidden');
+  document.getElementById('modal-devpanel').classList.add('hidden');
   document.getElementById('modal-' + which).classList.remove('hidden');
+  if (which === 'modal-devpanel') document.getElementById('modal-devpanel').classList.remove('hidden');
   if (which === 'leaderboard') renderLeaderboardModal();
   if (which === 'skins') renderSkinGrid();
   if (which === 'instructions') showInstrTab('controls');
   if (which === 'settings') renderSettings();
+  if (which === 'devpanel') { renderDevPanel(); }
 }
 
 function renderSkinGrid() {
@@ -5427,19 +5731,20 @@ function renderLeaderboardModal() {
   const scores = getScores();
   const list = document.getElementById('lb-list-modal');
   const empty = document.getElementById('lb-empty');
-  if (scores.length === 0) {
+  if (scores.every(s => s.score === 0)) {
     list.innerHTML = '';
     empty.style.display = 'block';
     return;
   }
   empty.style.display = 'none';
-  list.innerHTML = scores.slice(0,10).map((s, i) =>
-    `<li>
-      <span class="rank">#${i+1}</span>
-      <span class="name">${escHtml(s.name)}</span>
-      <span class="score">${s.score ?? '-'} pt &nbsp;<span style="opacity:0.45;font-size:11px;">${fmtTime(s.time)}</span></span>
-    </li>`
-  ).join('');
+  list.innerHTML = scores.map((s, i) => {
+    const isMe = currentUser && s.name === currentUser.username;
+    return `<li style="${isMe ? 'background:rgba(0,245,255,0.06);border-left:2px solid var(--cyan);' : ''}">
+      <span class="rank">${i===0 && s.score>0 ? '★' : '#'+(i+1)}</span>
+      <span class="name" style="${isMe ? 'color:var(--cyan);' : ''}">${escHtml(s.name)}${isMe ? ' ◀' : ''}</span>
+      <span class="score">${s.score > 0 ? s.score+' pt &nbsp;<span style=\"opacity:0.45;font-size:11px;\">' + fmtTime(s.time) + '</span>' : '—'}</span>
+    </li>`;
+  }).join('');
 }
 
 function escHtml(s) {
@@ -5447,24 +5752,7 @@ function escHtml(s) {
 }
 
 function saveScore() {
-  const name = document.getElementById('player-name').value.trim() || 'Anonimo';
-  savedName = name;
-  localStorage.setItem('vr_name', name);
-
-  const finalScore = Math.floor(score);
-  const bestScore = parseInt(localStorage.getItem('vr_best_score') || '0');
-  if (finalScore > bestScore) localStorage.setItem('vr_best_score', finalScore);
-
-  // Push new score; saveScores handles deduplication (keeps best per name)
-  const scores = getScores();
-  scores.push({ name, score: finalScore, time: elapsed });
-  saveScores(scores); // dedup + sort inside saveScores
-
-  renderLeaderboard();
-  const btn = document.querySelector('#screen-over .btn-sm');
-  btn.textContent = '✓ SALVATO';
-  btn.style.background = '#00c853';
-  setTimeout(() => { btn.textContent = STRINGS[currentLang].btn_save || 'SALVA'; btn.style.background = ''; }, 2000);
+  // Mantenuto per compatibilità — salvataggio ora avviene automaticamente in showGameOver
 }
 
 // ─── START GAME ──────────────────────────────────────────────────
@@ -5521,7 +5809,16 @@ buildPlanetCache(); // cache planet bodies before first frame
 // Restore control mode cursor
 canvas.style.cursor = controlMode === 'mouse' ? 'crosshair' : 'default';
 applyLang();
-showStart();
+// Prova a ripristinare una sessione salvata (es. dopo refresh pagina)
+const _hadSession = restoreSession();
+if (!_hadSession) {
+  // Nessuna sessione — mostra login screen, nascondi tutto il resto
+  document.getElementById('screen-start').classList.add('hidden');
+  document.getElementById('screen-over').classList.add('hidden');
+} else {
+  // Sessione ripristinata — mostra schermata principale
+  showStart();
+}
 
 lastTime = performance.now();
 animId = requestAnimationFrame(gameLoop);
@@ -5537,15 +5834,9 @@ document.addEventListener('click',   _audioBootstrap, { once: true });
 document.addEventListener('keydown',  _audioBootstrap, { once: true });
 document.addEventListener('touchstart', _audioBootstrap, { once: true, passive: true });
 
-// Handle enter key in name input
-document.getElementById('player-name').addEventListener('keydown', e => {
-  if (e.key === 'Enter') saveScore();
-});
-
-// Prevent space from triggering buttons when typing
-document.getElementById('player-name').addEventListener('keydown', e => {
-  e.stopPropagation();
-});
+// (login form enter key)
+document.getElementById('login-user').addEventListener('keydown', _loginKeydown);
+document.getElementById('login-pass').addEventListener('keydown', _loginKeydown);
 </script>
 </body>
 </html>
