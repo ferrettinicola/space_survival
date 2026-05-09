@@ -761,7 +761,31 @@ const DEFAULT_ACCOUNTS = [
   { id: 3, username: 'Ale',    password: '123', isAdmin: false },
 ];
 
-let currentUser = null; // oggetto account loggato
+// ── Seeded PRNG — stesso mondo per tutti i giocatori ogni giorno ──────
+function mulberry32(seed) {
+  return function() {
+    seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+    var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+function getTodaySeed() {
+  const d = new Date();
+  // Seme = anno * 10000 + mese * 100 + giorno → uguale per tutti nello stesso giorno
+  return d.getFullYear() * 10000 + (d.getMonth() + 1) * 100 + d.getDate();
+}
+// Wrappa initWorld() con Math.random() seeded per garantire stesso mondo
+const _origInitWorld = typeof initWorld === 'function' ? initWorld : null;
+function initWorldSeeded() {
+  const seeded = mulberry32(getTodaySeed());
+  const _orig = Math.random;
+  Math.random = seeded;
+  try { initWorld(); } finally { Math.random = _orig; }
+}
+// ──────────────────────────────────────────────────────────────────────
+
+let currentUser = null;
 
 function initAccounts() {
   if (!localStorage.getItem('vr_accounts')) {
@@ -959,15 +983,20 @@ function devShowLogins(username) {
   panel.style.display = 'block';
   content.innerHTML = '<span style="opacity:0.4;">Caricamento...</span>';
 
-  fetch(SERVER_URL + '/admin/logins')
-    .then(r => r.json())
-    .then(events => {
+  Promise.all([
+    fetch(SERVER_URL + '/admin/online').then(r => r.json()),
+    fetch(SERVER_URL + '/admin/logins').then(r => r.json()),
+  ]).then(([online, events]) => {
+      const isOnline = online.includes(username);
       const userEvents = events.filter(e => e.username === username).reverse();
+      const onlineBadge = isOnline
+        ? '<span style="color:#00ff60;font-size:10px;margin-bottom:6px;display:block;">● Online adesso</span>'
+        : '';
       if (userEvents.length === 0) {
-        content.innerHTML = '<span style="opacity:0.35;">Nessun accesso registrato</span>';
+        content.innerHTML = onlineBadge + '<span style="opacity:0.35;">Nessun accesso registrato</span>';
         return;
       }
-      content.innerHTML = userEvents.slice(0, 15).map(e => {
+      content.innerHTML = onlineBadge + userEvents.slice(0, 15).map(e => {
         const d = new Date(e.timestamp);
         const date = d.toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'2-digit' });
         const time = d.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
@@ -978,7 +1007,7 @@ function devShowLogins(username) {
         </div>`;
       }).join('');
     })
-    .catch(() => { content.innerHTML = '<span style="color:#ff5555;">Server non raggiungibile</span>'; });
+    .catch(() => { content.innerHTML = '<span style="color:#ff5555;">Server non raggiungibile — verifica che Railway sia online</span>'; });
 }
 function devToggleEdit(id) {
   const el = document.getElementById('dev-edit-' + id);
@@ -1097,7 +1126,19 @@ const MP = (() => {
     socket.on('player_update', (d) => {
       if (d.id === socket.id) return;
       const p = remotePlayers.get(d.id);
-      if (p) Object.assign(p, d);
+      if (p) {
+        // Salva posizione target per interpolazione fluida
+        if (d.x !== undefined) p.targetX = d.x;
+        if (d.y !== undefined) p.targetY = d.y;
+        if (d.angle !== undefined) p.angle = d.angle;
+        if (d.hp    !== undefined) p.hp    = d.hp;
+        if (d.skin  !== undefined) p.skin  = d.skin;
+        // Sincronizza punteggio degli altri nel localStorage locale
+        if (d.score !== undefined && p.username) {
+          const cur = parseInt(localStorage.getItem('vr_best_' + p.username) || '0');
+          if (d.score > cur) localStorage.setItem('vr_best_' + p.username, d.score);
+        }
+      }
     });
     socket.on('player_left', (id) => remotePlayers.delete(id));
     socket.on('bullet', (d) => {
@@ -1133,7 +1174,7 @@ const MP = (() => {
   function sendUpdate() {
     if (!socket || !player || !_inGame || inVoid) return;
     const now = performance.now();
-    if (now - _lastSend < 50) return;
+    if (now - _lastSend < 33) return;
     _lastSend = now;
     socket.emit('update', {
       x:player.x, y:player.y, angle:player.angle,
@@ -1163,6 +1204,15 @@ const MP = (() => {
       const b = remoteBullets[i];
       b.x += b.vx*dt; b.y += b.vy*dt; b.life -= dt/b.maxLife;
       if (b.life <= 0) remoteBullets.splice(i,1);
+    }
+  }
+
+  // Interpolazione posizioni remote (chiamata ogni frame)
+  function updateRemotePlayers(dt) {
+    const lerp = Math.min(1, dt * 14); // velocità interpolazione
+    for (const [, rp] of remotePlayers) {
+      if (rp.targetX !== undefined) rp.x += (rp.targetX - rp.x) * lerp;
+      if (rp.targetY !== undefined) rp.y += (rp.targetY - rp.y) * lerp;
     }
   }
 
@@ -1237,7 +1287,8 @@ const MP = (() => {
   }
 
   return { connect, joinGame, leaveGame, sendUpdate, sendBullet, checkHit,
-           updateRemoteBullets, drawRemotePlayers, drawRemoteBullets, drawHitMessage,
+           updateRemoteBullets, updateRemotePlayers,
+           drawRemotePlayers, drawRemoteBullets, drawHitMessage,
            disconnect, sendLoginEvent,
            get active()        { return !!socket && _inGame; },
            get remotePlayers() { return remotePlayers; } };
@@ -5770,6 +5821,7 @@ function gameLoop(ts) {
     // Meteor–meteor collisions
     checkMeteorCollisions();
   MP.updateRemoteBullets(dt);
+  MP.updateRemotePlayers(dt);
 
     // Remove meteors far outside viewport (keep those potentially orbiting nearby objects)
     const margin = 500;
@@ -6173,7 +6225,7 @@ function startGame() {
   voidWorldObjects = [];
   voidTransition = { active: false, t: 0, duration: 2.8 };
   voidExitTransition = { active: false, t: 0, duration: 2.6 };
-  initWorld();
+  initWorldSeeded();
   buildPlanetCache(); // pre-render planet bodies to OffscreenCanvas
   for (let i = 0; i < 4; i++) spawnMeteor();
 
@@ -6183,7 +6235,7 @@ function startGame() {
 // ─── INIT ────────────────────────────────────────────────────────
 initStars();
 buildNebula();
-initWorld();   // populate planets/galaxies so start screen is full
+initWorldSeeded();   // stesso mondo per tutti (seme = data di oggi)
 buildPlanetCache(); // cache planet bodies before first frame
 // Restore control mode cursor
 canvas.style.cursor = controlMode === 'mouse' ? 'crosshair' : 'default';
