@@ -2350,8 +2350,25 @@ function drawShipBody(c, skinId, boosting, thrustOn) {
 // ─── PLAYER ──────────────────────────────────────────────────────
 function makePlayer() {
   const stats = SHIP_STATS[selectedSkin] || SHIP_STATS[0];
+
+  // Trova uno spawn sicuro lontano dai buchi neri (min 1200px)
+  const SAFE_R = 1200;
+  let spawnX = WORLD_W / 2, spawnY = WORLD_H / 2;
+  if (blackHoles && blackHoles.length > 0) {
+    let tries = 0;
+    while (tries < 200) {
+      const cx = WORLD_W / 2 + (Math.random() - 0.5) * 4000;
+      const cy = WORLD_H / 2 + (Math.random() - 0.5) * 4000;
+      const safe = blackHoles.every(bh =>
+        Math.hypot(cx - bh.wx, cy - bh.wy) > SAFE_R
+      );
+      if (safe) { spawnX = cx; spawnY = cy; break; }
+      tries++;
+    }
+  }
+
   return {
-    x: WORLD_W / 2, y: WORLD_H / 2,
+    x: spawnX, y: spawnY,
     vx: 0, vy: 0,
     angle: -Math.PI / 2,
     targetAngle: -Math.PI / 2,
