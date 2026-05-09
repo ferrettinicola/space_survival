@@ -1077,8 +1077,19 @@ const MP = (() => {
       remotePlayers.clear(); remoteBullets.length = 0;
     });
     socket.on('players', (list) => {
-      for (const [id, p] of Object.entries(list))
-        if (id !== socket.id) remotePlayers.set(id, {...p});
+      const entries = Object.entries(list).filter(([id]) => id !== socket.id);
+      for (const [id, p] of entries) remotePlayers.set(id, {...p});
+
+      // Se ci sono già altri giocatori in partita, spawna vicino al primo
+      if (entries.length > 0 && player) {
+        const nearest = entries[0][1];
+        if (nearest.x && nearest.y) {
+          player.x = nearest.x + (Math.random() - 0.5) * 500;
+          player.y = nearest.y + (Math.random() - 0.5) * 500;
+          camera.x = player.x;
+          camera.y = player.y;
+        }
+      }
     });
     socket.on('player_joined', (p) => {
       if (p.id !== socket.id) remotePlayers.set(p.id, {...p});
@@ -5771,11 +5782,12 @@ function gameLoop(ts) {
     drawAliens();
     updateAndDrawPowerUps(dt);
     drawPlayer(player, dt);
+
+    ctx.restore(); // fine trasformazione camera
+
+    // Navicelle e proiettili remoti: disegnati in coordinate schermo (fuori dalla camera transform)
     MP.drawRemotePlayers();
     MP.drawRemoteBullets();
-
-    ctx.restore();
-
     MP.drawHitMessage(dt);
     drawMinimap();
     if (state === 'playing') {
