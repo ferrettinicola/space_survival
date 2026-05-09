@@ -813,6 +813,8 @@ function attemptLogin() {
   AudioEngine.init();
   AudioEngine.startMusic();
   MP.connect(); // connette al server multiplayer
+  // Registra accesso sul server (per il pannello sviluppatore)
+  setTimeout(() => MP.sendLoginEvent(currentUser.username), 800);
 }
 
 function logout() {
@@ -844,6 +846,7 @@ function restoreSession() {
       document.getElementById('login-screen').style.display = 'none';
       applyUserContext();
       MP.connect();
+      setTimeout(() => MP.sendLoginEvent(currentUser.username), 800);
       return true;
     }
   }
@@ -881,9 +884,7 @@ function renderDevPanel() {
     <div style="font-size:10px;letter-spacing:0.15em;color:rgba(200,232,248,0.4);margin-bottom:12px;">
       ${accounts.length} account registrati
     </div>
-
     <div id="dev-users-list" style="margin-bottom:16px;display:flex;flex-direction:column;gap:8px;"></div>
-
     <div style="border-top:1px solid rgba(0,245,255,0.12);padding-top:14px;margin-top:4px;">
       <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:0.22em;color:rgba(200,232,248,0.4);margin-bottom:10px;">AGGIUNGI UTENTE</div>
       <div style="display:flex;gap:8px;margin-bottom:6px;">
@@ -905,20 +906,26 @@ function renderDevPanel() {
     const row = document.createElement('div');
     row.style.cssText = 'background:rgba(0,245,255,0.04);border:1px solid rgba(0,245,255,0.12);border-radius:4px;padding:10px 12px;';
     row.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:6px;">
         <span style="font-family:'Orbitron',sans-serif;font-size:10px;color:${acc.isAdmin ? 'var(--gold)' : 'var(--cyan)'};letter-spacing:0.12em;">
           ${escHtml(acc.username)}${acc.isAdmin ? ' ★' : ''}
         </span>
-        <button onclick="devToggleEdit(${acc.id})"
-          style="font-family:'Orbitron',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.12em;background:rgba(0,245,255,0.1);color:var(--cyan);border:1px solid rgba(0,245,255,0.25);border-radius:3px;padding:4px 10px;cursor:pointer;">
-          MODIFICA
-        </button>
+        <div style="display:flex;gap:5px;">
+          <button onclick="devShowLogins('${escHtml(acc.username)}')"
+            style="font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:0.1em;background:rgba(255,215,0,0.08);color:var(--gold);border:1px solid rgba(255,215,0,0.25);border-radius:3px;padding:4px 8px;cursor:pointer;">
+            ACCESSI
+          </button>
+          <button onclick="devToggleEdit(${acc.id})"
+            style="font-family:'Orbitron',sans-serif;font-size:8px;font-weight:700;letter-spacing:0.1em;background:rgba(0,245,255,0.1);color:var(--cyan);border:1px solid rgba(0,245,255,0.25);border-radius:3px;padding:4px 8px;cursor:pointer;">
+            MODIFICA
+          </button>
+        </div>
       </div>
-      <div id="dev-edit-${acc.id}" style="display:none;margin-top:10px;display:none;">
+      <div id="dev-edit-${acc.id}" style="display:none;margin-top:10px;">
         <div style="display:flex;gap:6px;margin-bottom:6px;">
           <input id="dev-edit-user-${acc.id}" value="${escHtml(acc.username)}" maxlength="20"
             style="flex:1;font-family:'Share Tech Mono',monospace;font-size:12px;background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.18);border-radius:3px;color:var(--cyan);padding:6px 8px;outline:none;" placeholder="Nome utente">
-          <input id="dev-edit-pass-${acc.id}" type="password" placeholder="Nuova password"  maxlength="30"
+          <input id="dev-edit-pass-${acc.id}" type="password" placeholder="Nuova password" maxlength="30"
             style="flex:1;font-family:'Share Tech Mono',monospace;font-size:12px;background:rgba(0,245,255,0.05);border:1px solid rgba(0,245,255,0.18);border-radius:3px;color:var(--cyan);padding:6px 8px;outline:none;">
         </div>
         <div style="display:flex;gap:6px;">
@@ -932,11 +939,47 @@ function renderDevPanel() {
           </button>` : ''}
         </div>
       </div>
+      <!-- Pannello accessi (nascosto) -->
+      <div id="dev-logins-${escHtml(acc.username)}" style="display:none;margin-top:10px;border-top:1px solid rgba(0,245,255,0.1);padding-top:8px;">
+        <div style="font-family:'Orbitron',sans-serif;font-size:8px;letter-spacing:0.18em;color:rgba(200,232,248,0.35);margin-bottom:8px;">CRONOLOGIA ACCESSI</div>
+        <div id="dev-logins-content-${escHtml(acc.username)}" style="font-size:11px;color:rgba(200,232,248,0.6);"></div>
+      </div>
     `;
     list.appendChild(row);
   });
 }
 
+// Mostra/nasconde cronologia accessi per un utente
+function devShowLogins(username) {
+  const panel = document.getElementById('dev-logins-' + username);
+  const content = document.getElementById('dev-logins-content-' + username);
+  if (!panel || !content) return;
+
+  if (panel.style.display !== 'none') { panel.style.display = 'none'; return; }
+  panel.style.display = 'block';
+  content.innerHTML = '<span style="opacity:0.4;">Caricamento...</span>';
+
+  fetch(SERVER_URL + '/admin/logins')
+    .then(r => r.json())
+    .then(events => {
+      const userEvents = events.filter(e => e.username === username).reverse();
+      if (userEvents.length === 0) {
+        content.innerHTML = '<span style="opacity:0.35;">Nessun accesso registrato</span>';
+        return;
+      }
+      content.innerHTML = userEvents.slice(0, 15).map(e => {
+        const d = new Date(e.timestamp);
+        const date = d.toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'2-digit' });
+        const time = d.toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' });
+        return `<div style="padding:5px 0;border-bottom:1px solid rgba(0,245,255,0.07);display:flex;gap:8px;align-items:baseline;">
+          <span style="color:var(--cyan);font-family:'Share Tech Mono',monospace;white-space:nowrap;">${date} ${time}</span>
+          <span style="opacity:0.55;">${e.browser} · ${e.os}</span>
+          <span style="opacity:0.3;font-size:10px;margin-left:auto;">IP ${e.ip || '?'}</span>
+        </div>`;
+      }).join('');
+    })
+    .catch(() => { content.innerHTML = '<span style="color:#ff5555;">Server non raggiungibile</span>'; });
+}
 function devToggleEdit(id) {
   const el = document.getElementById('dev-edit-' + id);
   if (!el) return;
@@ -1166,9 +1209,14 @@ const MP = (() => {
     remotePlayers.clear(); remoteBullets.length=0; _inGame=false;
   }
 
+  function sendLoginEvent(username) {
+    if (socket && socket.connected) socket.emit('login_event', { username });
+  }
+
   return { connect, joinGame, leaveGame, sendUpdate, sendBullet, checkHit,
            updateRemoteBullets, drawRemotePlayers, drawRemoteBullets, drawHitMessage,
-           disconnect, get active() { return !!socket && _inGame; } };
+           disconnect, sendLoginEvent,
+           get active() { return !!socket && _inGame; } };
 })();
 // ══════════════════════════════════════════════════════════════════
 
