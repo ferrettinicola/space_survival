@@ -1216,7 +1216,8 @@ const MP = (() => {
   return { connect, joinGame, leaveGame, sendUpdate, sendBullet, checkHit,
            updateRemoteBullets, drawRemotePlayers, drawRemoteBullets, drawHitMessage,
            disconnect, sendLoginEvent,
-           get active() { return !!socket && _inGame; } };
+           get active()        { return !!socket && _inGame; },
+           get remotePlayers() { return remotePlayers; } };
 })();
 // ══════════════════════════════════════════════════════════════════
 
