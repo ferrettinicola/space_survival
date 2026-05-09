@@ -2,11 +2,13 @@
 
 > **Survive the cosmos.** An HTML5 arcade space shooter — no install, no dependencies.
 
+🎮 **Play now:** [gamespacerace.netlify.app](https://gamespacerace.netlify.app)
+
 ---
 
 ## How to Play
 
-Open `space_survival.html` in any modern browser. That's it.
+Open the link above in any modern browser. Create an account or log in with your credentials.
 
 ### Controls
 
@@ -15,6 +17,7 @@ Open `space_survival.html` in any modern browser. That's it.
 | `↑ ↓ ← →` / `W A S D` | Move the ship |
 | `SPACE` | Boost — burst of speed |
 | `Click` / `F` | Fire |
+| `M` | Mute / Unmute |
 
 ---
 
@@ -23,7 +26,7 @@ Open `space_survival.html` in any modern browser. That's it.
 A toroidal star field **20,000 × 20,000 pixels** — fly off one edge and you re-enter from the opposite side. The world is filled with planets, galaxies, pulsars, supernovas, constellations (based on real RA/Dec coordinates), asteroid belts and black holes — all procedurally distributed with uniform spacing every game.
 
 ### Health
-You start with **20 HP**. Large meteors kill instantly (−20 HP), small fragments deal −5 HP, alien lasers deal −5 HP. Collect the green drop from Scout aliens to recover +10 HP.
+You start with **20 HP**. Large meteors deal −20 HP (instant kill), small fragments deal −5 HP, alien lasers deal −5 HP. Collect the green drop from Scout aliens to recover +10 HP.
 
 ---
 
@@ -63,7 +66,7 @@ Four types with distinct behaviors, each dropping a different power-up:
 The golden star makes you nearly unstoppable: speed +120%, full invincibility, auto-shield 220px that destroys nearby meteors, homing missiles that lock onto 2 targets simultaneously.
 
 ### 🔥 Ship Ability (12 seconds)
-A second smaller star drops with Star Power, activating your ship's unique special ability.
+A second smaller star drops alongside Star Power, activating your ship's unique special ability.
 
 ---
 
@@ -75,9 +78,31 @@ Fly into a **black hole** to be pulled into an alternate dimension:
 - Time runs **1.875×** faster — everything is more intense
 - **4 types of dark meteors**: obsidian, plasma, ghost, shard
 - **6 enemy turrets** that auto-aim and fire (−2 HP; +5 HP if destroyed)
+- **Void Reapers** — dark cloaked enemies that orbit and charge at you
+- **Pulse rings** — expanding shockwaves that deal −5 HP on contact
 - Boost and ammo are **unlimited**
-- **Survive 45 seconds** → cinematic exit animation → return to the main world
-- Countdown shown **bottom-left** of the screen
+- **Survive 45 real seconds** → cinematic exit animation → return to the main world
+- Countdown shown at the **bottom center** of the screen
+
+---
+
+## 🌐 Multiplayer
+
+The game supports real-time multiplayer:
+
+- Log in with your account and start a match
+- See other players' ships on screen with their name and HP bar
+- Other players' bullets deal **−3 HP**
+- The **round minimap** in the bottom-right shows where all players are — with border arrows when they are far away
+
+---
+
+## Accounts & Leaderboard
+
+- Login with username and password
+- Your best score is saved automatically at the end of each match
+- The leaderboard shows all registered players
+- The developer panel (admin only) allows account management and access log monitoring
 
 ---
 
@@ -93,12 +118,6 @@ Fly into a **black hole** to be pulled into an alternate dimension:
 | Void turret destroyed | +15 |
 | Alien (Scout / Chaotic / Bomber) | +20 |
 | Dreadnought | +50 |
-
----
-
-## Leaderboard
-
-Local leaderboard, top 20 scores. Each name appears **at most once** — only the highest score is kept. Works fully offline.
 
 ---
 
@@ -118,18 +137,8 @@ Procedurally generated each game with even grid-based distribution:
 
 ## Languages
 
-🌐 English / Italian — toggle in the top-right corner on menu screens.
+🌐 English / Italian — toggle in the settings panel ⚙.
 
 ---
 
-## Files
-
-```
-space_survival.html      ← complete game, single file
-SPACE_RACE_context.md    ← detailed developer context document
-README.md                ← this file
-```
-
----
-
-*Built with HTML5 Canvas, CSS3 and vanilla JavaScript. Zero external dependencies.*
+*Built with HTML5 Canvas, CSS3 and vanilla JavaScript. Multiplayer via Node.js + Socket.io.*
