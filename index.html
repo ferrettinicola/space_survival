@@ -812,9 +812,9 @@ function attemptLogin() {
   applyUserContext();
   AudioEngine.init();
   AudioEngine.startMusic();
-  MP.connect(); // connette al server multiplayer
-  // Registra accesso sul server (per il pannello sviluppatore)
+  MP.connect();
   setTimeout(() => MP.sendLoginEvent(currentUser.username), 800);
+  showStart(); // mostra la schermata principale del gioco
 }
 
 function logout() {
